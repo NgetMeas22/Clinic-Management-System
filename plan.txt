@@ -1,0 +1,708 @@
+
+
+🏥 Clinic Management System — 10 Days Plan
+🧰 Technology
+Frontend  : React + JavaScript
+Backend   : Laravel 10 REST API
+Database  : MySQL
+Database  : HeidiSQL
+Server    : Laragon
+API Test  : Postman
+Auth      : Laravel Sanctum
+🟢 DAY 1 — Project Setup + Database Design
+🎯 គោលដៅ
+
+រៀបចំ Project និង Design Database ឱ្យបានត្រឹមត្រូវ។
+
+1. Create Project
+clinic-management/
+│
+├── backend/
+└── frontend/
+
+Laravel:
+
+composer create-project laravel/laravel:^10.0 backend
+
+React:
+
+npm create vite@latest frontend
+
+ជ្រើស:
+
+React
+JavaScript
+2. Database
+
+បង្កើត Database ក្នុង HeidiSQL:
+
+clinic_management
+
+Laravel .env:
+
+DB_DATABASE=clinic_management
+DB_USERNAME=root
+DB_PASSWORD=
+3. Database Tables
+
+
+//=====================ថ្ងៃនេះ Design Tables:=======================//
+
+users
+roles
+departments
+patients
+doctors
+appointments
+medical_records
+medicines
+prescriptions
+prescription_items
+payments
+4. Draw ERD
+Department
+    │
+    └── Doctors
+          │
+          └── Appointments
+                    │
+                    └── Patients
+                          │
+                          └── Medical Records
+                                  │
+                                  └── Prescriptions
+                                          │
+                                          └── Medicines
+✅ ចប់ Day 1 ត្រូវបាន
+
+Laravel run បាន
+React run បាន
+MySQL connection បាន
+Database created
+ERD រួច
+Tables design រួច
+
+
+🟢 DAY 2 — Laravel Database + Models
+🎯 គោលដៅ
+
+បង្កើត Database structure ពិតប្រាកដក្នុង Laravel។
+
+បង្កើត migrations:
+
+php artisan make:migration create_roles_table
+php artisan make:migration create_departments_table
+php artisan make:migration create_patients_table
+php artisan make:migration create_doctors_table
+php artisan make:migration create_appointments_table
+php artisan make:migration create_medical_records_table
+php artisan make:migration create_medicines_table
+php artisan make:migration create_prescriptions_table
+php artisan make:migration create_prescription_items_table
+php artisan make:migration create_payments_table
+
+Models:
+
+php artisan make:model Patient
+php artisan make:model Doctor
+php artisan make:model Department
+php artisan make:model Appointment
+php artisan make:model MedicalRecord
+php artisan make:model Medicine
+php artisan make:model Prescription
+php artisan make:model PrescriptionItem
+php artisan make:model Payment
+//=========================================================================//
+Run:
+
+php artisan migrate
+🔗 Relationships
+
+ឧទាហរណ៍:
+
+Department
+  hasMany()
+      ↓
+Doctors
+
+Doctor
+  hasMany()
+      ↓
+Appointments
+
+Patient
+  hasMany()
+      ↓
+Appointments
+✅ ចប់ Day 2
+Migrations
+Models
+Foreign Keys
+Relationships
+Database completed
+
+//=========================================================================//
+
+🟢 DAY 3 — Authentication + Roles
+🎯 គោលដៅ
+
+ធ្វើ Login System។
+
+Install Sanctum:
+
+composer require laravel/sanctum
+
+បង្កើត:
+
+AuthController
+
+API:
+
+POST /api/login
+POST /api/logout
+GET  /api/me
+
+Roles:
+
+Admin
+Doctor
+Receptionist
+Login Flow
+React Login
+     ↓
+POST /api/login
+     ↓
+Laravel
+     ↓
+Validate
+     ↓
+Token
+     ↓
+React
+     ↓
+Dashboard
+Role Permission
+Admin
+→ Full Access
+
+Doctor
+→ Patients
+→ Appointments
+→ Medical Records
+→ Prescriptions
+
+Receptionist
+→ Patients
+→ Appointments
+→ Payments
+React
+
+បង្កើត:
+
+Login.jsx
+AuthContext.jsx
+ProtectedRoute.jsx
+✅ ចប់ Day 3
+Login
+Logout
+Token
+Role
+Protected API
+Protected React routes
+
+//=========================================================================//
+
+🟢 DAY 4 — Patient + Doctor + Department
+🎯 គោលដៅ
+
+ធ្វើ CRUD សម្រាប់ Core Data។
+
+👨‍⚕️ Doctor CRUD
+Create
+Read
+Update
+Delete
+
+Fields:
+
+name
+phone
+email
+specialization
+department_id
+
+🧑 Patient CRUD
+first_name
+last_name
+gender
+date_of_birth
+phone
+email
+address
+blood_group
+
+API:
+
+GET    /api/patients
+POST   /api/patients
+GET    /api/patients/{id}
+PUT    /api/patients/{id}
+DELETE /api/patients/{id}
+
+
+React:
+
+Patients.jsx
+Doctors.jsx
+Departments.jsx
+Features
+Search
+Pagination
+Validation
+Modal Form
+Delete Confirmation
+✅ ចប់ Day 4
+
+Admin អាច:
+
+Add Patient
+Edit Patient
+Delete Patient
+Search Patient
+Add Doctor
+Edit Doctor
+Manage Department
+
+//=========================================================================//
+
+🟢 DAY 5 — Appointment System
+🎯 គោលដៅ
+
+បង្កើតការកក់ពេលជួប Doctor
+
+Appointment:
+
+patient_id
+doctor_id
+appointment_date
+appointment_time
+reason
+status
+
+Status:
+
+Pending
+Confirmed
+Completed
+Cancelled
+Workflow
+Receptionist
+      ↓
+Select Patient
+      ↓
+Select Doctor
+      ↓
+Select Date
+      ↓
+Select Time
+      ↓
+Create Appointment
+      ↓
+Doctor sees Appointment
+
+API:
+
+GET    /api/appointments
+POST   /api/appointments
+PUT    /api/appointments/{id}
+DELETE /api/appointments/{id}
+
+React:
+
+Appointments.jsx
+UI
+Appointment List
+       ↓
+Search / Filter
+       ↓
+Status Badge
+       ↓
+Create Appointment
+✅ ចប់ Day 5
+Appointment CRUD
+Doctor assignment
+Patient assignment
+Status management
+
+//=========================================================================//
+
+🟢 DAY 6 — Medical Record + Prescription
+🎯 គោលដៅ
+
+នេះជា Main Logic របស់ Clinic 🩺
+
+Medical Record
+patient_id
+doctor_id
+appointment_id
+symptoms
+diagnosis
+treatment
+notes
+
+Doctor workflow:
+
+Appointment
+     ↓
+Open Patient
+     ↓
+Check Symptoms
+     ↓
+Diagnosis
+     ↓
+Treatment
+     ↓
+Save Medical Record
+💊 Prescription
+
+Prescription:
+
+patient_id
+doctor_id
+medical_record_id
+prescription_date
+notes
+
+Prescription Items:
+
+prescription_id
+medicine_id
+quantity
+dosage
+frequency
+duration
+instruction
+
+Example:
+
+Paracetamol
+Quantity: 10
+Dosage: 500mg
+Frequency: 2 times/day
+Duration: 5 days
+React
+MedicalRecords.jsx
+Prescriptions.jsx
+✅ ចប់ Day 6
+
+Doctor អាច:
+
+View appointments
+View patient history
+Create diagnosis
+Create medical record
+Create prescription
+🟢 DAY 7 — Medicine + Payment
+🎯 គោលដៅ
+
+គ្រប់គ្រងថ្នាំ និងការបង់ប្រាក់។
+
+💊 Medicine
+
+Fields:
+
+name
+category
+description
+quantity
+price
+expiry_date
+
+Features:
+
+Add
+Edit
+Delete
+Search
+Stock
+Expiry
+💵 Payment
+
+Fields:
+
+patient_id
+appointment_id
+amount
+payment_method
+payment_status
+payment_date
+
+Payment methods:
+
+Cash
+ABA
+Card
+
+Status:
+
+Pending
+Paid
+Cancelled
+Workflow
+Patient
+   ↓
+Appointment
+   ↓
+Treatment
+   ↓
+Payment
+   ↓
+Paid
+React
+Medicines.jsx
+Payments.jsx
+✅ ចប់ Day 7
+Medicine CRUD
+Stock management
+Payment CRUD
+Payment status
+🟢 DAY 8 — Dashboard + Reports
+🎯 គោលដៅ
+
+ធ្វើឱ្យ Project មើលទៅ Professional។
+
+Dashboard:
+
+┌─────────────────────────────────────────┐
+│ Total Patients       1,250              │
+│ Total Doctors          35               │
+│ Appointments Today     48               │
+│ Total Revenue       $12,450             │
+└─────────────────────────────────────────┘
+Charts
+Patients per Month
+Appointments per Month
+Revenue per Month
+Reports
+Patient Report
+Doctor Report
+Appointment Report
+Payment Report
+Medicine Report
+Filter
+Today
+This Week
+This Month
+Custom Date
+React
+Dashboard.jsx
+Reports.jsx
+Backend
+DashboardController
+ReportController
+✅ ចប់ Day 8
+
+Dashboard អាចបង្ហាញ Real Data ពី Database។
+
+🟢 DAY 9 — UI + Security + Testing
+🎯 គោលដៅ
+
+Polish Project និងរក Bugs។
+
+UI
+
+ពិនិត្យ:
+
+Sidebar
+Navbar
+Tables
+Forms
+Buttons
+Modal
+Loading
+Error Message
+Success Message
+Validation
+
+ឧទាហរណ៍:
+
+Email → valid email
+Phone → required
+Patient Name → required
+Appointment Date → required
+Payment Amount → numeric
+Security
+
+ពិនិត្យ:
+
+Authentication
+Authorization
+API Token
+Role Permission
+Validation
+SQL Injection Protection
+Mass Assignment
+
+Laravel ប្រើ:
+
+Form Request Validation
+Eloquent ORM
+Sanctum
+Middleware
+Testing
+
+Test ជាមួយ Postman:
+
+Login
+Patient API
+Doctor API
+Appointment API
+Medical Record API
+Prescription API
+Payment API
+✅ ចប់ Day 9
+Bugs fixed
+UI polished
+API tested
+Validation completed
+Roles tested
+🟢 DAY 10 — Finalization + Presentation
+🎯 គោលដៅ
+
+រៀបចំ Project សម្រាប់ Final Presentation 🎓
+
+1. GitHub
+git init
+git add .
+git commit -m "Initial Clinic Management System"
+git branch -M main
+git remote add origin YOUR_REPOSITORY
+git push -u origin main
+2. README
+
+ត្រូវមាន:
+
+Project Introduction
+Features
+Technologies
+Installation
+Database Setup
+API Documentation
+Screenshots
+Team Members
+3. Documentation
+
+រៀប:
+
+1. Introduction
+2. Problem Statement
+3. Objectives
+4. System Features
+5. System Architecture
+6. ERD
+7. Database Design
+8. API Documentation
+9. UI Design
+10. Testing
+11. Conclusion
+4. Presentation Flow
+
+ពេល Demo:
+
+1. Login
+      ↓
+2. Admin Dashboard
+      ↓
+3. Manage Doctors
+      ↓
+4. Register Patient
+      ↓
+5. Create Appointment
+      ↓
+6. Doctor Login
+      ↓
+7. Medical Record
+      ↓
+8. Prescription
+      ↓
+9. Receptionist
+      ↓
+10. Payment
+      ↓
+11. Reports
+🎯 10 Days Summary
+Day	Main Task	Result
+1	Setup + ERD	Project & DB Design
+2	Migration + Models	Database Complete
+3	Auth + Roles	Login System
+4	Patient + Doctor	CRUD
+5	Appointment	Booking System
+6	Medical Record + Prescription	Doctor System
+7	Medicine + Payment	Billing System
+8	Dashboard + Reports	Analytics
+9	UI + Security + Testing	Stable System
+10	GitHub + Documentation	🎓 Final Ready
+⭐ Priority
+
+ក្នុងរយៈពេលតែ 10 ថ្ងៃ កុំចាប់ផ្ដើម Feature ច្រើនពេក។ ត្រូវផ្តោតលើ៖
+
+Authentication → CRUD → Relationships → Business Logic → Dashboard → Testing
+
+បើ 7 ចំណុចនេះធ្វើបានល្អ Project នឹងមានគុណភាពជាងការមាន Feature 20 មុខ ប៉ុន្តែមុខងារមិនដំណើរការ។
+
+
+
+
+                    ┌─────────────┐
+                    │    roles    │
+                    └──────┬──────┘
+                           │
+                           │ 1:M
+                           ↓
+                    ┌─────────────┐
+                    │    users    │
+                    └──────┬──────┘
+                           │
+                           │ 1:1
+                           ↓
+                    ┌─────────────┐
+                    │   doctors   │
+                    └──────┬──────┘
+                           │
+                    M:1    │
+                           ↓
+                    ┌─────────────┐
+                    │ departments │
+                    └─────────────┘
+
+
+┌─────────────┐
+│   patients  │
+└──────┬──────┘
+       │
+       ├──────────────┐
+       │              │
+       ↓              ↓
+┌──────────────┐  ┌──────────────────┐
+│ appointments │  │ medical_records │
+└──────┬───────┘  └────────┬─────────┘
+       │                   │
+       │                   ↓
+       │            ┌──────────────┐
+       │            │ prescriptions│
+       │            └──────┬───────┘
+       │                   │
+       │                   ↓
+       │            ┌───────────────────┐
+       │            │ prescription_items│
+       │            └─────────┬─────────┘
+       │                      │
+       │                      ↓
+       │               ┌────────────┐
+       │               │ medicines  │
+       │               └────────────┘
+       │
+       ↓
+┌──────────────┐
+│   payments   │
+└──────────────┘

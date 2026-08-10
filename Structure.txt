@@ -1,0 +1,180 @@
+clinic-management-system/
+│
+├── backend/                         # Laravel 10 REST API
+│   │
+│   ├── app/
+│   │   ├── Http/
+│   │   │   ├── Controllers/
+│   │   │   │   ├── AuthController.php
+│   │   │   │   ├── DashboardController.php
+│   │   │   │   ├── RoleController.php
+│   │   │   │   ├── UserController.php
+│   │   │   │   ├── DepartmentController.php
+│   │   │   │   ├── DoctorController.php
+│   │   │   │   ├── PatientController.php
+│   │   │   │   ├── AppointmentController.php
+│   │   │   │   ├── MedicalRecordController.php
+│   │   │   │   ├── MedicineController.php
+│   │   │   │   ├── PrescriptionController.php
+│   │   │   │   └── PaymentController.php
+│   │   │   │
+│   │   │   └── Requests/
+│   │   │       ├── LoginRequest.php
+│   │   │       ├── PatientRequest.php
+│   │   │       ├── DoctorRequest.php
+│   │   │       └── AppointmentRequest.php
+│   │   │
+│   │   ├── Models/
+│   │   │   ├── User.php
+│   │   │   ├── Role.php
+│   │   │   ├── Department.php
+│   │   │   ├── Doctor.php
+│   │   │   ├── Patient.php
+│   │   │   ├── Appointment.php
+│   │   │   ├── MedicalRecord.php
+│   │   │   ├── Medicine.php
+│   │   │   ├── Prescription.php
+│   │   │   ├── PrescriptionItem.php
+│   │   │   └── Payment.php
+│   │   │
+│   │   └── Providers/
+│   │
+│   ├── database/
+│   │   ├── migrations/
+│   │   ├── seeders/
+│   │   │   ├── DatabaseSeeder.php
+│   │   │   ├── RoleSeeder.php
+│   │   │   ├── UserSeeder.php
+│   │   │   ├── DepartmentSeeder.php
+│   │   │   └── MedicineSeeder.php
+│   │   └── factories/
+│   │
+│   ├── routes/
+│   │   ├── api.php
+│   │   └── web.php
+│   │
+│   ├── config/
+│   ├── resources/
+│   ├── storage/
+│   ├── tests/
+│   ├── .env
+│   ├── artisan
+│   └── composer.json
+│
+│
+└── frontend/                        # React
+    │
+    ├── public/
+    │   └── images/
+    │
+    ├── src/
+    │   │
+    │   ├── assets/
+    │   │   ├── images/
+    │   │   └── icons/
+    │   │
+    │   ├── components/
+    │   │   ├── common/
+    │   │   │   ├── Button.jsx
+    │   │   │   ├── Modal.jsx
+    │   │   │   ├── Loading.jsx
+    │   │   │   └── Pagination.jsx
+    │   │   │
+    │   │   ├── layout/
+    │   │   │   ├── Navbar.jsx
+    │   │   │   ├── Sidebar.jsx
+    │   │   │   └── Footer.jsx
+    │   │   │
+    │   │   └── forms/
+    │   │       ├── PatientForm.jsx
+    │   │       ├── DoctorForm.jsx
+    │   │       └── AppointmentForm.jsx
+    │   │
+    │   ├── pages/
+    │   │   ├── auth/
+    │   │   │   ├── Login.jsx
+    │   │   │   └── Register.jsx
+    │   │   │
+    │   │   ├── dashboard/
+    │   │   │   └── Dashboard.jsx
+    │   │   │
+    │   │   ├── patients/
+    │   │   │   ├── PatientList.jsx
+    │   │   │   ├── PatientCreate.jsx
+    │   │   │   ├── PatientEdit.jsx
+    │   │   │   └── PatientDetail.jsx
+    │   │   │
+    │   │   ├── doctors/
+    │   │   │   ├── DoctorList.jsx
+    │   │   │   ├── DoctorCreate.jsx
+    │   │   │   ├── DoctorEdit.jsx
+    │   │   │   └── DoctorDetail.jsx
+    │   │   │
+    │   │   ├── departments/
+    │   │   │   ├── DepartmentList.jsx
+    │   │   │   └── DepartmentForm.jsx
+    │   │   │
+    │   │   ├── appointments/
+    │   │   │   ├── AppointmentList.jsx
+    │   │   │   ├── AppointmentCreate.jsx
+    │   │   │   └── AppointmentDetail.jsx
+    │   │   │
+    │   │   ├── medical-records/
+    │   │   │   ├── MedicalRecordList.jsx
+    │   │   │   └── MedicalRecordDetail.jsx
+    │   │   │
+    │   │   ├── medicines/
+    │   │   │   ├── MedicineList.jsx
+    │   │   │   ├── MedicineCreate.jsx
+    │   │   │   └── MedicineEdit.jsx
+    │   │   │
+    │   │   ├── prescriptions/
+    │   │   │   ├── PrescriptionList.jsx
+    │   │   │   ├── PrescriptionCreate.jsx
+    │   │   │   └── PrescriptionDetail.jsx
+    │   │   │
+    │   │   ├── payments/
+    │   │   │   ├── PaymentList.jsx
+    │   │   │   └── PaymentDetail.jsx
+    │   │   │
+    │   │   └── users/
+    │   │       ├── UserList.jsx
+    │   │       └── UserForm.jsx
+    │   │
+    │   ├── layouts/
+    │   │   ├── AdminLayout.jsx
+    │   │   ├── DoctorLayout.jsx
+    │   │   └── ReceptionistLayout.jsx
+    │   │
+    │   ├── routes/
+    │   │   ├── AppRoutes.jsx
+    │   │   ├── ProtectedRoute.jsx
+    │   │   └── RoleRoute.jsx
+    │   │
+    │   ├── services/
+    │   │   ├── api.js
+    │   │   ├── authService.js
+    │   │   ├── patientService.js
+    │   │   ├── doctorService.js
+    │   │   ├── appointmentService.js
+    │   │   ├── medicineService.js
+    │   │   └── paymentService.js
+    │   │
+    │   ├── context/
+    │   │   └── AuthContext.jsx
+    │   │
+    │   ├── hooks/
+    │   │   └── useAuth.js
+    │   │
+    │   ├── utils/
+    │   │   ├── formatDate.js
+    │   │   └── formatCurrency.js
+    │   │
+    │   ├── App.jsx
+    │   ├── main.jsx
+    │   └── index.css
+    │
+    ├── package.json
+    ├── vite.config.js
+    └── .env
+    

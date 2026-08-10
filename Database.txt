@@ -1,0 +1,341 @@
+-- ============================================
+-- CLINIC MANAGEMENT SYSTEM
+-- Laravel 10 + MySQL
+-- ============================================
+
+CREATE DATABASE IF NOT EXISTS clinic_management
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+
+USE clinic_management;
+
+
+-- ============================================
+-- 1. ROLES
+-- ============================================
+
+CREATE TABLE roles (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    description VARCHAR(255) NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP
+);
+
+
+-- ============================================
+-- 2. USERS
+-- ============================================
+
+CREATE TABLE users (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    role_id BIGINT UNSIGNED NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    phone VARCHAR(30) NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_users_role
+        FOREIGN KEY (role_id)
+        REFERENCES roles(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+);
+
+
+-- ============================================
+-- 3. DEPARTMENTS
+-- ============================================
+
+CREATE TABLE departments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP
+);
+
+
+-- ============================================
+-- 4. DOCTORS
+-- ============================================
+
+CREATE TABLE doctors (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL UNIQUE,
+    department_id BIGINT UNSIGNED NOT NULL,
+    specialization VARCHAR(150) NOT NULL,
+    license_number VARCHAR(100) NOT NULL UNIQUE,
+    gender ENUM('male', 'female', 'other') NOT NULL,
+    date_of_birth DATE NULL,
+    address TEXT NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_doctors_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_doctors_department
+        FOREIGN KEY (department_id)
+        REFERENCES departments(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+);
+
+
+-- ============================================
+-- 5. PATIENTS
+-- ============================================
+
+CREATE TABLE patients (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    patient_code VARCHAR(30) NOT NULL UNIQUE,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    gender ENUM('male', 'female', 'other') NOT NULL,
+    date_of_birth DATE NULL,
+    blood_group VARCHAR(5) NULL,
+    phone VARCHAR(30) NULL,
+    email VARCHAR(150) NULL,
+    address TEXT NULL,
+    emergency_contact VARCHAR(100) NULL,
+    emergency_phone VARCHAR(30) NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP
+);
+
+
+-- ============================================
+-- 6. APPOINTMENTS
+-- ============================================
+
+CREATE TABLE appointments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    patient_id BIGINT UNSIGNED NOT NULL,
+    doctor_id BIGINT UNSIGNED NOT NULL,
+    appointment_date DATE NOT NULL,
+    appointment_time TIME NOT NULL,
+    reason TEXT NULL,
+    status ENUM(
+        'pending',
+        'confirmed',
+        'completed',
+        'cancelled'
+    ) DEFAULT 'pending',
+    notes TEXT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_appointments_patient
+        FOREIGN KEY (patient_id)
+        REFERENCES patients(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_appointments_doctor
+        FOREIGN KEY (doctor_id)
+        REFERENCES doctors(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    INDEX idx_appointment_date (appointment_date),
+    INDEX idx_appointment_status (status)
+);
+
+
+-- ============================================
+-- 7. MEDICAL RECORDS
+-- ============================================
+
+CREATE TABLE medical_records (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    patient_id BIGINT UNSIGNED NOT NULL,
+    doctor_id BIGINT UNSIGNED NOT NULL,
+    appointment_id BIGINT UNSIGNED NOT NULL UNIQUE,
+    symptoms TEXT NULL,
+    diagnosis TEXT NULL,
+    treatment TEXT NULL,
+    notes TEXT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_medical_records_patient
+        FOREIGN KEY (patient_id)
+        REFERENCES patients(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_medical_records_doctor
+        FOREIGN KEY (doctor_id)
+        REFERENCES doctors(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_medical_records_appointment
+        FOREIGN KEY (appointment_id)
+        REFERENCES appointments(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+);
+
+
+-- ============================================
+-- 8. MEDICINES
+-- ============================================
+
+CREATE TABLE medicines (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    category VARCHAR(100) NULL,
+    description TEXT NULL,
+    quantity INT UNSIGNED DEFAULT 0,
+    unit VARCHAR(30) NOT NULL,
+    price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    expiry_date DATE NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_medicine_name (name),
+    INDEX idx_medicine_expiry (expiry_date)
+);
+
+
+-- ============================================
+-- 9. PRESCRIPTIONS
+-- ============================================
+
+CREATE TABLE prescriptions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    patient_id BIGINT UNSIGNED NOT NULL,
+    doctor_id BIGINT UNSIGNED NOT NULL,
+    medical_record_id BIGINT UNSIGNED NOT NULL,
+    prescription_date DATE NOT NULL,
+    notes TEXT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_prescriptions_patient
+        FOREIGN KEY (patient_id)
+        REFERENCES patients(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_prescriptions_doctor
+        FOREIGN KEY (doctor_id)
+        REFERENCES doctors(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_prescriptions_medical_record
+        FOREIGN KEY (medical_record_id)
+        REFERENCES medical_records(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+);
+
+
+-- ============================================
+-- 10. PRESCRIPTION ITEMS
+-- ============================================
+
+CREATE TABLE prescription_items (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    prescription_id BIGINT UNSIGNED NOT NULL,
+    medicine_id BIGINT UNSIGNED NOT NULL,
+    quantity INT UNSIGNED NOT NULL,
+    dosage VARCHAR(100) NOT NULL,
+    frequency VARCHAR(100) NOT NULL,
+    duration VARCHAR(100) NOT NULL,
+    instruction TEXT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_prescription_items_prescription
+        FOREIGN KEY (prescription_id)
+        REFERENCES prescriptions(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_prescription_items_medicine
+        FOREIGN KEY (medicine_id)
+        REFERENCES medicines(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+);
+
+
+-- ============================================
+-- 11. PAYMENTS
+-- ============================================
+
+CREATE TABLE payments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    patient_id BIGINT UNSIGNED NOT NULL,
+    appointment_id BIGINT UNSIGNED NOT NULL,
+    amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    payment_method ENUM(
+        'cash',
+        'aba',
+        'card'
+    ) NOT NULL,
+    payment_status ENUM(
+        'pending',
+        'paid',
+        'cancelled'
+    ) DEFAULT 'pending',
+    transaction_code VARCHAR(100) NULL UNIQUE,
+    payment_date DATETIME NULL,
+    notes TEXT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_payments_patient
+        FOREIGN KEY (patient_id)
+        REFERENCES patients(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_payments_appointment
+        FOREIGN KEY (appointment_id)
+        REFERENCES appointments(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+);
+
+
+-- ============================================
+-- DEFAULT ROLES
+-- ============================================
+
+INSERT INTO roles (name, description) VALUES
+('Admin', 'Full system access'),
+('Doctor', 'Manage appointments, medical records and prescriptions'),
+('Receptionist', 'Manage patients, appointments and payments');
+
+
+-- ============================================
+-- CHECK TABLES
+-- ============================================
+
+SHOW TABLES;

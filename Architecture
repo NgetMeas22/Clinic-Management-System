@@ -1,0 +1,61 @@
+┌──────────────────────────────┐
+│          React Frontend      │
+│                              │
+│ Pages → Components → Service │
+└──────────────┬───────────────┘
+               │
+               │ HTTP / JSON
+               │ Axios
+               ↓
+┌──────────────────────────────┐
+│       Laravel 10 API         │
+│                              │
+│ Routes → Controllers         │
+│              ↓               │
+│           Models             │
+└──────────────┬───────────────┘
+               │
+               │ Eloquent
+               ↓
+┌──────────────────────────────┐
+│        MySQL Database        │
+│          HeidiSQL            │
+└──────────────────────────────┘
+
+
+
+
+==========================
+👥 Role Permission
+Admin
+==========================
+Dashboard
+Users
+Roles
+Departments
+Doctors
+Patients
+Appointments
+Medical Records
+Medicines
+Prescriptions
+Payments
+Reports
+
+==========================
+Doctor
+==========================
+Dashboard
+My Appointments
+My Patients
+Medical Records
+Prescriptions
+
+==========================
+Receptionist
+==========================
+Dashboard
+Patients
+Appointments
+Payments
+    
