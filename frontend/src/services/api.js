@@ -22,4 +22,24 @@ api.interceptors.request.use(
   }
 );
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+
+    if (status === 401) {
+      localStorage.removeItem('token');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+
+    if (status === 403) {
+      window.dispatchEvent(new CustomEvent('api-forbidden'));
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 export default api;

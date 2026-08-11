@@ -10,6 +10,21 @@ use Throwable;
 
 class AppointmentController extends Controller
 {
+    private function isDoctor(Request $request): bool
+    {
+        return optional($request->user()->loadMissing('role')->role)->name === 'Doctor';
+    }
+
+    private function doctorId(Request $request): ?int
+    {
+        return optional($request->user()->loadMissing('doctor')->doctor)->id;
+    }
+
+    private function forbidden()
+    {
+        return response()->json(['message' => 'Forbidden'], 403);
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -19,7 +34,7 @@ class AppointmentController extends Controller
         try {
             $query = Appointment::with([
                 'patient',
-                'doctor'
+                'doctor.user'
             ]);
 
             // Search
@@ -35,6 +50,16 @@ class AppointmentController extends Controller
             // Filter status
             if ($request->filled('status')) {
                 $query->where('status', $request->status);
+            }
+
+            if ($this->isDoctor($request)) {
+                $doctorId = $this->doctorId($request);
+
+                if (!$doctorId) {
+                    return $this->forbidden();
+                }
+
+                $query->where('doctor_id', $doctorId);
             }
 
             $appointments = $query
@@ -72,7 +97,7 @@ class AppointmentController extends Controller
 
             $appointment->load([
                 'patient',
-                'doctor'
+                'doctor.user'
             ]);
 
             return response()->json([
@@ -98,12 +123,16 @@ class AppointmentController extends Controller
     }
 
     // GET /api/appointments/{id}
-    public function show(Appointment $appointment)
+    public function show(Request $request, Appointment $appointment)
     {
         try {
+            if ($this->isDoctor($request) && $appointment->doctor_id !== $this->doctorId($request)) {
+                return $this->forbidden();
+            }
+
             $appointment->load([
                 'patient',
-                'doctor'
+                'doctor.user'
             ]);
 
             return response()->json([
@@ -124,20 +153,32 @@ class AppointmentController extends Controller
     public function update(Request $request, Appointment $appointment)
     {
         try {
-            $validated = $request->validate([
+            if ($this->isDoctor($request)) {
+                if ($appointment->doctor_id !== $this->doctorId($request)) {
+                    return $this->forbidden();
+                }
+
+                $validated = $request->validate([
+                    'status' => 'sometimes|required|in:pending,confirmed,completed,cancelled',
+                    'notes' => 'nullable|string',
+                ]);
+            } else {
+                $validated = $request->validate([
                 'patient_id' => 'sometimes|required|exists:patients,id',
                 'doctor_id' => 'sometimes|required|exists:doctors,id',
                 'appointment_date' => 'sometimes|required|date',
                 'appointment_time' => 'sometimes|required',
                 'reason' => 'nullable|string',
                 'status' => 'sometimes|required|in:pending,confirmed,completed,cancelled',
-            ]);
+                'notes' => 'nullable|string',
+                ]);
+            }
 
             $appointment->update($validated);
 
             $appointment->load([
                 'patient',
-                'doctor'
+                'doctor.user'
             ]);
 
             return response()->json([

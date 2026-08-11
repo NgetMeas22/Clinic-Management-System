@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 import paymentService from "../services/paymentService";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../utils/permissions";
 
 const Payments = () => {
+    const { user } = useAuth();
     const [payments, setPayments] = useState([]);
     const [status, setStatus] = useState('');
     const [loading, setLoading] = useState(true);
+    const canCreate = can(user, "payments", "create");
+    const canDelete = can(user, "payments", "delete");
 
     // Fetch payments
     useEffect(() => {
@@ -18,9 +23,7 @@ const Payments = () => {
                             status || undefined,
                     });
 
-                setPayments(
-                    response.data?.data || []
-                );
+                setPayments(response.data?.data || []);
             } catch (error) {
                 console.error(
                     'Failed to load payments:',
@@ -54,9 +57,7 @@ const Payments = () => {
                         status || undefined,
                 });
 
-            setPayments(
-                response.data?.data || []
-            );
+            setPayments(response.data?.data || []);
         } catch (error) {
             console.error(
                 'Failed to delete payment:',
@@ -84,11 +85,13 @@ const Payments = () => {
                     Payments
                 </h1>
 
-                <button
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                    + Add Payment
-                </button>
+                {canCreate && (
+                    <button
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                        + Add Payment
+                    </button>
+                )}
 
             </div>
 
@@ -107,15 +110,15 @@ const Payments = () => {
                         All Status
                     </option>
 
-                    <option value="Pending">
+                    <option value="pending">
                         Pending
                     </option>
 
-                    <option value="Paid">
+                    <option value="paid">
                         Paid
                     </option>
 
-                    <option value="Cancelled">
+                    <option value="cancelled">
                         Cancelled
                     </option>
 
@@ -204,11 +207,11 @@ const Payments = () => {
 
                                         <span
                                             className={
-                                                payment.payment_status ===
-                                                'Paid'
+                                                payment.payment_status?.toLowerCase() ===
+                                                'paid'
                                                     ? 'text-green-600 font-semibold'
-                                                    : payment.payment_status ===
-                                                      'Cancelled'
+                                                    : payment.payment_status?.toLowerCase() ===
+                                                      'cancelled'
                                                     ? 'text-red-600 font-semibold'
                                                     : 'text-yellow-600 font-semibold'
                                             }
@@ -226,16 +229,22 @@ const Payments = () => {
                                     {/* Action */}
                                     <td className="p-3">
 
-                                        <button
-                                            onClick={() =>
-                                                handleDelete(
-                                                    payment.id
-                                                )
-                                            }
-                                            className="text-red-600 hover:text-red-800"
-                                        >
-                                            Delete
-                                        </button>
+                                        {canDelete ? (
+                                            <button
+                                                onClick={() =>
+                                                    handleDelete(
+                                                        payment.id
+                                                    )
+                                                }
+                                                className="text-red-600 hover:text-red-800"
+                                            >
+                                                Delete
+                                            </button>
+                                        ) : (
+                                            <span className="text-gray-500 text-sm">
+                                                No delete
+                                            </span>
+                                        )}
 
                                     </td>
 

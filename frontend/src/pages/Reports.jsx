@@ -32,7 +32,7 @@ export default function Reports() {
                         response = { data: [] };
                 }
 
-                setData(response.data || []);
+                setData(response.data?.data || []);
             } catch (error) {
                 console.error("Failed to load report", error);
             } finally {
@@ -105,7 +105,7 @@ export default function Reports() {
                 return (
                     <tr key={itemKey} className="border-t">
                         <td className="px-6 py-4 text-sm">{item.id}</td>
-                        <td className="px-6 py-4 text-sm font-medium">{item.name}</td>
+                        <td className="px-6 py-4 text-sm font-medium">{`${item.first_name || ""} ${item.last_name || ""}`.trim()}</td>
                         <td className="px-6 py-4 text-sm">{item.phone}</td>
                         <td className="px-6 py-4 text-sm">{item.gender}</td>
                     </tr>
@@ -114,17 +114,17 @@ export default function Reports() {
                 return (
                     <tr key={itemKey} className="border-t">
                         <td className="px-6 py-4 text-sm">{item.id}</td>
-                        <td className="px-6 py-4 text-sm font-medium">{item.name}</td>
+                        <td className="px-6 py-4 text-sm font-medium">{item.user?.name || "-"}</td>
                         <td className="px-6 py-4 text-sm">{item.specialization}</td>
-                        <td className="px-6 py-4 text-sm">{item.phone}</td>
+                        <td className="px-6 py-4 text-sm">{item.user?.phone || "-"}</td>
                     </tr>
                 );
             case "appointments":
                 return (
                     <tr key={itemKey} className="border-t">
                         <td className="px-6 py-4 text-sm">{item.id}</td>
-                        <td className="px-6 py-4 text-sm">{item.patient?.name || "-"}</td>
-                        <td className="px-6 py-4 text-sm">{item.doctor?.name || "-"}</td>
+                        <td className="px-6 py-4 text-sm">{item.patient ? `${item.patient.first_name || ""} ${item.patient.last_name || ""}`.trim() : "-"}</td>
+                        <td className="px-6 py-4 text-sm">{item.doctor?.user?.name || "-"}</td>
                         <td className="px-6 py-4 text-sm">{item.appointment_date}</td>
                         <td className="px-6 py-4 text-sm">{item.status}</td>
                     </tr>
@@ -133,10 +133,10 @@ export default function Reports() {
                 return (
                     <tr key={itemKey} className="border-t">
                         <td className="px-6 py-4 text-sm">{item.id}</td>
-                        <td className="px-6 py-4 text-sm">{item.patient?.name || "-"}</td>
+                        <td className="px-6 py-4 text-sm">{item.patient ? `${item.patient.first_name || ""} ${item.patient.last_name || ""}`.trim() : "-"}</td>
                         <td className="px-6 py-4 text-sm">${item.amount}</td>
                         <td className="px-6 py-4 text-sm">{item.payment_method}</td>
-                        <td className="px-6 py-4 text-sm">{item.status}</td>
+                        <td className="px-6 py-4 text-sm">{item.payment_status}</td>
                     </tr>
                 );
             case "medicines":

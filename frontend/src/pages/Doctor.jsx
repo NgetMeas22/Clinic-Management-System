@@ -20,8 +20,11 @@ import {
   updateDoctor,
   deleteDoctor,
 } from "../services/doctorService";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../utils/permissions";
 
 export default function Doctors() {
+  const { user } = useAuth();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,6 +55,9 @@ export default function Doctors() {
     bio: "",
   };
   const [formData, setFormData] = useState(initialFormState);
+  const canCreate = can(user, "doctors", "create");
+  const canUpdate = can(user, "doctors", "update");
+  const canDelete = can(user, "doctors", "delete");
 
   const specializationOptions = [
     "General Practitioner",
@@ -227,13 +233,15 @@ export default function Doctors() {
             Manage clinical staff, specializations, and availability.
           </p>
         </div>
-        <button
-          onClick={handleOpenAddModal}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors"
-        >
-          <UserPlus size={18} />
-          <span>Add New Doctor</span>
-        </button>
+        {canCreate && (
+          <button
+            onClick={handleOpenAddModal}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors"
+          >
+            <UserPlus size={18} />
+            <span>Add New Doctor</span>
+          </button>
+        )}
       </div>
 
       {/* Search & Filter Container */}
@@ -391,20 +399,29 @@ export default function Doctors() {
                         {/* Dropdown Menu */}
                         {activeMenuId === doc.id && (
                           <div className="absolute right-6 top-12 w-32 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20 text-left">
-                            <button
-                              onClick={() => handleOpenEditModal(doc)}
-                              className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                              <Pencil size={14} />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => handleDelete(doc.id)}
-                              className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50"
-                            >
-                              <Trash2 size={14} />
-                              <span>Delete</span>
-                            </button>
+                            {canUpdate && (
+                              <button
+                                onClick={() => handleOpenEditModal(doc)}
+                                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              >
+                                <Pencil size={14} />
+                                <span>Edit</span>
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                onClick={() => handleDelete(doc.id)}
+                                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                              >
+                                <Trash2 size={14} />
+                                <span>Delete</span>
+                              </button>
+                            )}
+                            {!canUpdate && !canDelete && (
+                              <div className="px-3.5 py-2 text-xs font-semibold text-slate-500">
+                                View only
+                              </div>
+                            )}
                           </div>
                         )}
                       </td>

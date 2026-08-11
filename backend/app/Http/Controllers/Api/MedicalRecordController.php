@@ -10,6 +10,21 @@ use Exception;
 
 class MedicalRecordController extends Controller
 {
+    private function isDoctor(Request $request): bool
+    {
+        return optional($request->user()->loadMissing('role')->role)->name === 'Doctor';
+    }
+
+    private function doctorId(Request $request): ?int
+    {
+        return optional($request->user()->loadMissing('doctor')->doctor)->id;
+    }
+
+    private function forbidden()
+    {
+        return response()->json(['message' => 'Forbidden'], 403);
+    }
+
     public function index(Request $request)
     {
         try {
@@ -26,6 +41,16 @@ class MedicalRecordController extends Controller
 
             if ($request->filled('doctor_id')) {
                 $query->where('doctor_id', $request->doctor_id);
+            }
+
+            if ($this->isDoctor($request)) {
+                $doctorId = $this->doctorId($request);
+
+                if (!$doctorId) {
+                    return $this->forbidden();
+                }
+
+                $query->where('doctor_id', $doctorId);
             }
 
             $records = $query
@@ -67,6 +92,14 @@ class MedicalRecordController extends Controller
         }
 
         try {
+            if ($this->isDoctor($request)) {
+                $doctorId = $this->doctorId($request);
+
+                if (!$doctorId || (int) $request->doctor_id !== $doctorId) {
+                    return $this->forbidden();
+                }
+            }
+
             $record = MedicalRecord::create(
                 $validator->validated()
             );
@@ -92,9 +125,13 @@ class MedicalRecordController extends Controller
         }
     }
 
-    public function show(MedicalRecord $medicalRecord)
+    public function show(Request $request, MedicalRecord $medicalRecord)
     {
         try {
+            if ($this->isDoctor($request) && $medicalRecord->doctor_id !== $this->doctorId($request)) {
+                return $this->forbidden();
+            }
+
             $medicalRecord->load([
                 'patient',
                 'doctor.user',
@@ -137,6 +174,14 @@ class MedicalRecordController extends Controller
         }
 
         try {
+            if ($this->isDoctor($request)) {
+                $doctorId = $this->doctorId($request);
+
+                if (!$doctorId || $medicalRecord->doctor_id !== $doctorId || (int) $request->doctor_id !== $doctorId) {
+                    return $this->forbidden();
+                }
+            }
+
             $medicalRecord->update(
                 $validator->validated()
             );

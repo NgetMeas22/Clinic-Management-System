@@ -20,9 +20,12 @@ class RoleMiddleware
             ], 401);
         }
 
-        if (!in_array($user->role, $roles)) {
+        $roleName = optional($user->loadMissing('role')->role)->name;
+        $allowedRoles = array_map('strtolower', $roles);
+
+        if (!$roleName || !in_array(strtolower($roleName), $allowedRoles, true)) {
             return response()->json([
-                'message' => 'Unauthorized'
+                'message' => 'Forbidden'
             ], 403);
         }
 

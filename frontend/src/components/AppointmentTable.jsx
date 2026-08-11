@@ -52,7 +52,7 @@ export default function AppointmentsManager({
       const patientName = `${item.patient?.first_name || ""} ${
         item.patient?.last_name || ""
       }`.toLowerCase();
-      const doctorName = (item.doctor?.name || "").toLowerCase();
+      const doctorName = (item.doctor?.user?.name || item.doctor?.name || "").toLowerCase();
       const reason = (item.reason || "").toLowerCase();
       const status = (item.status || "").toLowerCase();
       const query = searchTerm.toLowerCase();
@@ -80,13 +80,15 @@ export default function AppointmentsManager({
             Manage and track patient consultation schedules.
           </p>
         </div>
-        <button
-          onClick={onAdd}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors"
-        >
-          <Plus size={18} />
-          <span>New Appointment</span>
-        </button>
+        {onAdd && (
+          <button
+            onClick={onAdd}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors"
+          >
+            <Plus size={18} />
+            <span>New Appointment</span>
+          </button>
+        )}
       </div>
 
       {/* Search & Filter Toolbar */}
@@ -161,8 +163,9 @@ export default function AppointmentsManager({
                         }`.trim()
                       : "Unassigned Patient";
 
-                  const doctorName = item.doctor?.name
-                    ? `Dr. ${item.doctor.name}`
+                  const doctorDisplayName = item.doctor?.user?.name || item.doctor?.name;
+                  const doctorName = doctorDisplayName
+                    ? `Dr. ${doctorDisplayName}`
                     : "Unassigned Doctor";
 
                   const formattedTime = item.appointment_time
@@ -249,26 +252,35 @@ export default function AppointmentsManager({
 
                         {activeMenuId === item.id && (
                           <div className="absolute right-6 top-12 w-32 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20 text-left">
-                            <button
-                              onClick={() => {
-                                setActiveMenuId(null);
-                                onEdit && onEdit(item);
-                              }}
-                              className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                              <Pencil size={14} />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                setActiveMenuId(null);
-                                onDelete && onDelete(item.id);
-                              }}
-                              className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50"
-                            >
-                              <Trash2 size={14} />
-                              <span>Delete</span>
-                            </button>
+                            {onEdit && (
+                              <button
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  onEdit(item);
+                                }}
+                                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              >
+                                <Pencil size={14} />
+                                <span>Edit</span>
+                              </button>
+                            )}
+                            {onDelete && (
+                              <button
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  onDelete(item.id);
+                                }}
+                                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                              >
+                                <Trash2 size={14} />
+                                <span>Delete</span>
+                              </button>
+                            )}
+                            {!onEdit && !onDelete && (
+                              <div className="px-3.5 py-2 text-xs font-semibold text-slate-500">
+                                View only
+                              </div>
+                            )}
                           </div>
                         )}
                       </td>

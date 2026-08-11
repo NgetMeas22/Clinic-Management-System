@@ -10,6 +10,19 @@ use Exception;
 
 class PaymentController extends Controller
 {
+    private function normalizePaymentPayload(array $data): array
+    {
+        if (isset($data['payment_method'])) {
+            $data['payment_method'] = strtolower($data['payment_method']);
+        }
+
+        if (isset($data['payment_status'])) {
+            $data['payment_status'] = strtolower($data['payment_status']);
+        }
+
+        return $data;
+    }
+
     /**
      * GET /api/payments
      */
@@ -83,10 +96,10 @@ class PaymentController extends Controller
                 'required|numeric|min:0',
 
             'payment_method' =>
-                'required|in:Cash,ABA,Card',
+                'required|in:cash,aba,card,Cash,ABA,Card',
 
             'payment_status' =>
-                'required|in:Pending,Paid,Cancelled',
+                'required|in:pending,paid,cancelled,Pending,Paid,Cancelled',
 
             'payment_date' =>
                 'required|date',
@@ -103,7 +116,7 @@ class PaymentController extends Controller
         try {
 
             $payment = Payment::create(
-                $validator->validated()
+                $this->normalizePaymentPayload($validator->validated())
             );
 
             $payment->load([
@@ -172,10 +185,10 @@ class PaymentController extends Controller
                 'required|numeric|min:0',
 
             'payment_method' =>
-                'required|in:Cash,ABA,Card',
+                'required|in:cash,aba,card,Cash,ABA,Card',
 
             'payment_status' =>
-                'required|in:Pending,Paid,Cancelled',
+                'required|in:pending,paid,cancelled,Pending,Paid,Cancelled',
 
             'payment_date' =>
                 'required|date',
@@ -192,7 +205,7 @@ class PaymentController extends Controller
         try {
 
             $payment->update(
-                $validator->validated()
+                $this->normalizePaymentPayload($validator->validated())
             );
 
             $payment->load([

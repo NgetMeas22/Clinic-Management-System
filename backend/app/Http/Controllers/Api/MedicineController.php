@@ -91,6 +91,7 @@ public function index(Request $request)
             'category'    => 'required|string|max:255',
             'description' => 'nullable|string',
             'quantity'    => 'required|integer|min:0',
+            'unit'        => 'required|string|max:50',
             'price'       => 'required|numeric|min:0',
             'expiry_date' => 'nullable|date',
         ]);

@@ -25,6 +25,12 @@ import Departments from "./pages/Department";
 
 import Medicines from "./pages/Medicine";
 import Payments from "./pages/Payment";
+import Reports from "./pages/Reports";
+import User from "./pages/User";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+import Support from "./pages/Support";
+import Unauthorized from "./pages/Unauthorized";
 
 // ========================================
 // Dashboard Layout
@@ -40,7 +46,7 @@ function DashboardShell() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 relative">
+    <div className="min-h-screen bg-slate-50 relative dark:bg-slate-950">
       {/* Sidebar - Fixed w-64 */}
       <Sidebar />
 
@@ -50,7 +56,7 @@ function DashboardShell() {
         <Navbar user={user} onLogout={handleLogout} />
 
         {/* Dynamic Outlet Page Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 bg-slate-50 p-4 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
@@ -76,8 +82,7 @@ function App() {
             <Route path="/register" element={<Register />} />
 
             {/* =================================
-                GENERAL PROTECTED ROUTES
-                Admin + Doctor + Receptionist
+                SHARED PROTECTED ROUTES
             ================================= */}
             <Route
                 element={
@@ -95,14 +100,16 @@ function App() {
                     <Route path="/appointments" element={<Appointments />} />
                     <Route path="/doctors" element={<Doctor />} />
                     <Route path="/patients" element={<Patients />} />
-                    <Route path="/departments" element={<Departments />} />
-                    <Route path="/medical-records" element={<MedicalRecords />} />
-                    <Route path="/prescriptions" element={<Prescriptions />} />
+                    <Route path="/medicines" element={<Medicines />} />
+                    <Route path="/inventory" element={<Medicines />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/support" element={<Support />} />
                 </Route>
             </Route>
 
             {/* =================================
-                MEDICINE ROUTES
+                CLINICAL ROUTES
                 Admin + Doctor
             ================================= */}
             <Route
@@ -113,12 +120,13 @@ function App() {
                 }
             >
                 <Route element={<DashboardShell />}>
-                    <Route path="/medicines" element={<Medicines />} />
+                    <Route path="/medical-records" element={<MedicalRecords />} />
+                    <Route path="/prescriptions" element={<Prescriptions />} />
                 </Route>
             </Route>
 
             {/* =================================
-                PAYMENT ROUTES
+                FRONT DESK ROUTES
                 Admin + Receptionist
             ================================= */}
             <Route
@@ -129,9 +137,29 @@ function App() {
                 }
             >
                 <Route element={<DashboardShell />}>
+                    <Route path="/departments" element={<Departments />} />
                     <Route path="/payments" element={<Payments />} />
+                    <Route path="/billing" element={<Payments />} />
                 </Route>
             </Route>
+
+            {/* =================================
+                ADMIN ROUTES
+            ================================= */}
+            <Route
+                element={
+                    <ProtectedRoute
+                        allowedRoles={["Admin"]}
+                    />
+                }
+            >
+                <Route element={<DashboardShell />}>
+                    <Route path="/reports" element={<Reports />} />
+                    <Route path="/users" element={<User />} />
+                </Route>
+            </Route>
+
+            <Route path="/403" element={<Unauthorized />} />
 
             {/* =================================
                 NOT FOUND

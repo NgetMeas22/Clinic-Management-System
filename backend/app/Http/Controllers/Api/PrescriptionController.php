@@ -11,6 +11,21 @@ use Exception;
 
 class PrescriptionController extends Controller
 {
+    private function isDoctor(Request $request): bool
+    {
+        return optional($request->user()->loadMissing('role')->role)->name === 'Doctor';
+    }
+
+    private function doctorId(Request $request): ?int
+    {
+        return optional($request->user()->loadMissing('doctor')->doctor)->id;
+    }
+
+    private function forbidden()
+    {
+        return response()->json(['message' => 'Forbidden'], 403);
+    }
+
     public function index(Request $request)
     {
         try {
@@ -27,6 +42,16 @@ class PrescriptionController extends Controller
 
             if ($request->filled('doctor_id')) {
                 $query->where('doctor_id', $request->doctor_id);
+            }
+
+            if ($this->isDoctor($request)) {
+                $doctorId = $this->doctorId($request);
+
+                if (!$doctorId) {
+                    return $this->forbidden();
+                }
+
+                $query->where('doctor_id', $doctorId);
             }
 
             $prescriptions = $query
@@ -77,6 +102,15 @@ class PrescriptionController extends Controller
         DB::beginTransaction();
 
         try {
+            if ($this->isDoctor($request)) {
+                $doctorId = $this->doctorId($request);
+
+                if (!$doctorId || (int) $request->doctor_id !== $doctorId) {
+                    DB::rollBack();
+                    return $this->forbidden();
+                }
+            }
+
             $prescription = Prescription::create([
                 'patient_id' => $request->patient_id,
                 'doctor_id' => $request->doctor_id,
@@ -123,9 +157,13 @@ class PrescriptionController extends Controller
         }
     }
 
-    public function show(Prescription $prescription)
+    public function show(Request $request, Prescription $prescription)
     {
         try {
+            if ($this->isDoctor($request) && $prescription->doctor_id !== $this->doctorId($request)) {
+                return $this->forbidden();
+            }
+
             $prescription->load([
                 'patient',
                 'doctor.user',
@@ -176,6 +214,15 @@ class PrescriptionController extends Controller
         DB::beginTransaction();
 
         try {
+            if ($this->isDoctor($request)) {
+                $doctorId = $this->doctorId($request);
+
+                if (!$doctorId || $prescription->doctor_id !== $doctorId || (int) $request->doctor_id !== $doctorId) {
+                    DB::rollBack();
+                    return $this->forbidden();
+                }
+            }
+
             $prescription->update([
                 'patient_id' => $request->patient_id,
                 'doctor_id' => $request->doctor_id,

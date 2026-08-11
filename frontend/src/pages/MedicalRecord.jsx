@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 import medicalRecordService from '../services/medicalRecordService';
+import { useAuth } from '../context/AuthContext';
+import { can } from '../utils/permissions';
 
 
 const MedicalRecords = () => {
+  const { user } = useAuth();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const canCreate = can(user, "medicalRecords", "create");
+  const canUpdate = can(user, "medicalRecords", "update");
 
   useEffect(() => {
     let isMounted = true;
@@ -15,7 +20,7 @@ const MedicalRecords = () => {
         const response = await medicalRecordService.getAll();
         
         // Handle various Laravel response pagination or array structures safely
-        const data = response.data?.data || response.data || [];
+        const data = response.data?.data?.data || response.data?.data || response.data || [];
         
         if (isMounted) {
           setRecords(Array.isArray(data) ? data : []);
@@ -57,9 +62,11 @@ const MedicalRecords = () => {
           <p className="text-slate-500 text-sm mt-0.5">Manage and view all patient clinical history</p>
         </div>
 
-        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 text-sm">
-          <span>+</span> Add Medical Record
-        </button>
+        {canCreate && (
+          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 text-sm">
+            <span>+</span> Add Medical Record
+          </button>
+        )}
       </div>
 
       {/* Table Container */}
@@ -109,9 +116,11 @@ const MedicalRecords = () => {
                       <button className="text-blue-600 hover:text-blue-800 font-medium text-xs">
                         View
                       </button>
-                      <button className="text-slate-600 hover:text-slate-900 font-medium text-xs">
-                        Edit
-                      </button>
+                      {canUpdate && (
+                        <button className="text-slate-600 hover:text-slate-900 font-medium text-xs">
+                          Edit
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import medicineService from "../services/medicineService";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../utils/permissions";
 
 const Medicines = () => {
+    const { user } = useAuth();
     const [medicines, setMedicines] = useState([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
+    const canCreate = can(user, "medicines", "create");
+    const canDelete = can(user, "medicines", "delete");
 
     // Fetch medicines
     useEffect(() => {
@@ -16,9 +21,7 @@ const Medicines = () => {
                     search,
                 });
 
-                setMedicines(
-                    response.data?.data || []
-                );
+                setMedicines(response.data || []);
             } catch (error) {
                 console.error(
                     'Failed to load medicines:',
@@ -50,9 +53,7 @@ const Medicines = () => {
                 search,
             });
 
-            setMedicines(
-                response.data?.data || []
-            );
+            setMedicines(response.data || []);
 
         } catch (error) {
             console.error(
@@ -95,11 +96,13 @@ const Medicines = () => {
                     Medicines
                 </h1>
 
-                <button
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                    + Add Medicine
-                </button>
+                {canCreate && (
+                    <button
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                        + Add Medicine
+                    </button>
+                )}
 
             </div>
 
@@ -238,16 +241,22 @@ const Medicines = () => {
                                         {/* Action */}
                                         <td className="p-3">
 
-                                            <button
-                                                onClick={() =>
-                                                    handleDelete(
-                                                        medicine.id
-                                                    )
-                                                }
-                                                className="text-red-600 hover:text-red-800"
-                                            >
-                                                Delete
-                                            </button>
+                                            {canDelete ? (
+                                                <button
+                                                    onClick={() =>
+                                                        handleDelete(
+                                                            medicine.id
+                                                        )
+                                                    }
+                                                    className="text-red-600 hover:text-red-800"
+                                                >
+                                                    Delete
+                                                </button>
+                                            ) : (
+                                                <span className="text-gray-500 text-sm">
+                                                    Read only
+                                                </span>
+                                            )}
 
                                         </td>
 

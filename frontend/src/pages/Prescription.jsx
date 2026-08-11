@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import prescriptionService from '../services/prescriptionService';
+import { useAuth } from '../context/AuthContext';
+import { can } from '../utils/permissions';
 
 
 const Prescriptions = () => {
+  const { user } = useAuth();
   const [prescriptions, setPrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const canCreate = can(user, "prescriptions", "create");
 
   useEffect(() => {
     let isMounted = true;
@@ -15,7 +19,7 @@ const Prescriptions = () => {
         const response = await prescriptionService.getAll();
 
         // Handle various API response structures safely
-        const data = response.data?.data || response.data || [];
+        const data = response.data?.data?.data || response.data?.data || response.data || [];
 
         if (isMounted) {
           setPrescriptions(Array.isArray(data) ? data : []);
@@ -57,9 +61,11 @@ const Prescriptions = () => {
           <p className="text-slate-500 text-sm mt-0.5">Manage patient prescriptions and medication plans</p>
         </div>
 
-        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 text-sm">
-          <span>+</span> Add Prescription
-        </button>
+        {canCreate && (
+          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 text-sm">
+            <span>+</span> Add Prescription
+          </button>
+        )}
       </div>
 
       {/* Prescriptions List */}

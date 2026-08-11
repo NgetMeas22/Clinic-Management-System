@@ -1,160 +1,93 @@
 import { useState } from "react";
-import { NavLink, Link } from "react-router-dom";
-import {
-  LayoutGrid,
-  Users,
-  Stethoscope,
-  Calendar,
-  Building2,
-  FileText,
-  Pill,
-  Menu,
-  X,
-  BriefcaseMedical,
-  Plus,
-  Settings,
-  HelpCircle,
-} from "lucide-react";
+import { Link, NavLink } from "react-router-dom";
+import { Banknote, BriefcaseMedical, Building2, Calendar, FileText, HelpCircle, LayoutGrid, Menu, Pill, Settings, ShieldCheck, Stethoscope, UserCog, UserRound, Users, X } from "lucide-react";
+import { useAuth } from "../../../context/AuthContext";
+import { canVisit } from "../../../utils/permissions";
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
+  const { user } = useAuth();
 
-  // Main Nav Items
   const mainNavItems = [
     { name: "Dashboard", icon: LayoutGrid, to: "/dashboard" },
-    { name: "Patients", icon: Users, to: "/patients" },
-    { name: "Doctors", icon: Stethoscope, to: "/doctors" },
-    { name: "Appointments", icon: Calendar, to: "/appointments" },
     { name: "Departments", icon: Building2, to: "/departments" },
+    { name: "Doctors", icon: Stethoscope, to: "/doctors" },
+    { name: "Patients", icon: Users, to: "/patients" },
+    { name: "Appointments", icon: Calendar, to: "/appointments" },
     { name: "Medical Records", icon: FileText, to: "/medical-records" },
-    { name: "Prescriptions", icon: Pill, to: "/prescriptions" },
-  ];
+    { name: "Prescriptions", icon: ShieldCheck, to: "/prescriptions" },
+    { name: "Medicines", icon: Pill, to: "/medicines" },
+    { name: "Inventory", icon: BriefcaseMedical, to: "/inventory" },
+    { name: "Payments", icon: Banknote, to: "/payments" },
+    { name: "Billing", icon: Banknote, to: "/billing" },
+    { name: "Reports", icon: FileText, to: "/reports" },
+    { name: "Users", icon: UserCog, to: "/users" },
+  ].filter((item) => canVisit(user, item.to));
 
-  // Secondary Bottom Nav Items
   const bottomNavItems = [
+    { name: "Profile", icon: UserRound, to: "/profile" },
     { name: "Settings", icon: Settings, to: "/settings" },
     { name: "Support", icon: HelpCircle, to: "/support" },
-  ];
+  ].filter((item) => canVisit(user, item.to));
+
+  const linkClass = ({ isActive }) =>
+    `relative flex w-full items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-semibold transition-colors ${
+      isActive
+        ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200"
+        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+    }`;
 
   return (
     <>
-      {/* Mobile Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-md bg-white shadow-md border text-slate-600 hover:bg-slate-100"
+        className="fixed left-4 top-4 z-50 rounded-md border bg-white p-2 text-slate-600 shadow-md lg:hidden"
         aria-label="Toggle Navigation"
       >
         {isOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
-      {/* Mobile Overlay */}
-      {isOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/30 z-40"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
+      {isOpen && <div className="fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={() => setIsOpen(false)} />}
 
-      {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen w-64 bg-white border-r border-slate-200 flex flex-col justify-between transition-transform duration-300 ease-in-out ${
+        className={`fixed left-0 top-0 z-40 flex h-screen w-64 flex-col justify-between border-r border-slate-200 bg-white transition-transform duration-300 dark:border-slate-700 dark:bg-slate-900 ${
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        {/* Top & Navigation Section */}
-        <div className="flex-1 flex flex-col overflow-y-auto">
-          {/* Logo Header */}
-          <div className="flex items-center gap-3 px-6 py-6">
-            <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-sm">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <Link to="/dashboard" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-6 py-6">
+            <div className="rounded-lg bg-blue-600 p-2.5 text-white shadow-sm">
               <BriefcaseMedical size={24} strokeWidth={2.5} />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-blue-600 leading-tight">
-                NGMClinic
-              </h1>
-              <p className="text-xs font-semibold text-slate-500 tracking-wide">
-                Medical System
-              </p>
+              <h1 className="text-lg font-bold leading-tight text-blue-600">NGMClinic</h1>
+              <p className="text-xs font-semibold text-slate-500">Medical System</p>
             </div>
-          </div>
+          </Link>
 
-          {/* Main Navigation Links */}
-          <nav className="mt-2 flex-1 space-y-1 px-3">
+          <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
             {mainNavItems.map((item) => {
               const Icon = item.icon;
               return (
-                <NavLink
-                  key={item.name}
-                  to={item.to}
-                  onClick={() => setIsOpen(false)}
-                  className={({ isActive }) =>
-                    `w-full flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors relative ${
-                      isActive
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-sm" />
-                      )}
-                      <Icon
-                        size={20}
-                        className={isActive ? "text-blue-600" : "text-slate-500"}
-                      />
-                      <span>{item.name}</span>
-                    </>
-                  )}
+                <NavLink key={item.name} to={item.to} onClick={() => setIsOpen(false)} className={linkClass}>
+                  <Icon size={19} />
+                  <span>{item.name}</span>
                 </NavLink>
               );
             })}
           </nav>
         </div>
 
-        {/* Bottom Section: Primary Action & Secondary Links */}
-        <div className="p-4 border-t border-slate-100 space-y-4 bg-white">
-          {/* New Appointment Button */}
-          <Link
-            to="/appointments"
-            onClick={() => setIsOpen(false)}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl shadow-sm transition-colors"
-          >
-            <Plus size={18} strokeWidth={2.5} />
-            <span>New Appointment</span>
-          </Link>
-
-          {/* Settings & Support Links */}
-          <div className="pt-2 space-y-1">
-            {bottomNavItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.name}
-                  to={item.to}
-                  onClick={() => setIsOpen(false)}
-                  className={({ isActive }) =>
-                    `w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-                      isActive
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <Icon
-                        size={20}
-                        className={isActive ? "text-blue-600" : "text-slate-500"}
-                      />
-                      <span>{item.name}</span>
-                    </>
-                  )}
-                </NavLink>
-              );
-            })}
-          </div>
+        <div className="space-y-1 border-t border-slate-100 p-4 dark:border-slate-800">
+          {bottomNavItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink key={item.name} to={item.to} onClick={() => setIsOpen(false)} className={linkClass}>
+                <Icon size={19} />
+                <span>{item.name}</span>
+              </NavLink>
+            );
+          })}
         </div>
       </aside>
     </>

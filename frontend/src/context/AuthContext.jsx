@@ -63,8 +63,19 @@ export const AuthProvider = ({ children }) => {
     return user;
   };
 
+  const updateProfile = async (data) => {
+    const res = await axios.put('/profile', data);
+    setUser(res.data.user);
+    return res.data;
+  };
+
+  const changePassword = async (data) => {
+    const res = await axios.put('/password', data);
+    return res.data;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading, updateProfile, changePassword }}>
       {children}
     </AuthContext.Provider>
   );

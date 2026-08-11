@@ -1,758 +1,626 @@
-import { useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
-  Users,
-  Stethoscope,
-  Calendar,
-  Banknote,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Plus,
-  MoreVertical,
-  ArrowRight,
-  Clock,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  SlidersHorizontal,
-} from "lucide-react";
-import {
-  AreaChart,
   Area,
-  BarChart,
+  AreaChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from "recharts";
+import {
+  Banknote,
+  Calendar,
+  Loader2,
+  MoreVertical,
+  Pill,
+  Plus,
+  Stethoscope,
+  TrendingDown,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import dashboardService from "../services/dashboardService";
+import medicineService from "../services/medicineService";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../utils/permissions";
 
-const FONTS = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-`;
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const COLORS = {
-  ink: "#101E2C",
-  slate: "#66738A",
-  slateLight: "#94A0B4",
-  bg: "#F4F6F8",
-  card: "#FFFFFF",
-  border: "#E5E9EE",
-  teal: "#2563EB",
-  tealSoft: "#EFF6FF",
-  tealDeep: "#1D4ED8",
-  green: "#10B981",
-  greenSoft: "#ECFDF5",
-  coral: "#E11D48",
-  coralSoft: "#FFF1F2",
-  amber: "#D97706",
-  amberSoft: "#FFFBEB",
-  violet: "#2563EB",
-  violetSoft: "#EFF6FF",
+const RANGES = [
+  { key: "week", label: "This Week" },
+  { key: "month", label: "This Month" },
+  { key: "year", label: "This Year" },
+];
+
+const STATUS_STYLES = {
+  confirmed: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+  pending: "bg-amber-50 text-amber-700 ring-amber-600/20",
+  cancelled: "bg-rose-50 text-rose-700 ring-rose-600/20",
+  completed: "bg-slate-100 text-slate-600 ring-slate-500/20",
 };
 
-export default function Dashboard({ onNavigateToAppointments }) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeMenuId, setActiveMenuId] = useState(null);
+function initialsOf(name = "") {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
 
-  const stats = [
-    {
-      title: "Total patients",
-      value: "1,248",
-      change: "+12%",
-      trend: "up",
-      icon: Users,
-      accent: COLORS.teal,
-      accentSoft: COLORS.tealSoft,
-    },
-    {
-      title: "Total doctors",
-      value: "48",
-      change: "No change",
-      trend: "flat",
-      icon: Stethoscope,
-      accent: COLORS.teal,
-      accentSoft: COLORS.tealSoft,
-    },
-    {
-      title: "Appointments today",
-      value: "32",
-      change: "-4%",
-      trend: "down",
-      icon: Calendar,
-      accent: COLORS.teal,
-      accentSoft: COLORS.tealSoft,
-    },
-    {
-      title: "Total revenue",
-      value: "$12.5K",
-      change: "+8%",
-      trend: "up",
-      icon: Banknote,
-      accent: COLORS.teal,
-      accentSoft: COLORS.tealSoft,
-    },
-  ];
+function compactNumber(value) {
+  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
 
-  const visitsData = [
-    { month: "Jan", visits: 620 },
-    { month: "Feb", visits: 780 },
-    { month: "Mar", visits: 910 },
-    { month: "Apr", visits: 860 },
-    { month: "May", visits: 1040 },
-    { month: "Jun", visits: 960 },
-  ];
+function daysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
 
-  const revenueData = [
-    { quarter: "Q1", revenue: 8.4 },
-    { quarter: "Q2", revenue: 11.2 },
-    { quarter: "Q3", revenue: 9.6 },
-    { quarter: "Q4", revenue: 12.5 },
-  ];
+function TrendBadge({ value }) {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) return null;
+  const numeric = Number(value);
+  const isUp = numeric >= 0;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+        isUp ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+      }`}
+    >
+      {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+      {isUp ? "+" : ""}
+      {numeric}%
+    </span>
+  );
+}
 
-  const departments = [
-    { name: "Cardiology", patients: 312, pct: 25, color: "#1D4ED8" },
-    { name: "Neurology", patients: 248, pct: 20, color: "#2563EB" },
-    { name: "Pediatrics", patients: 274, pct: 22, color: "#3B82F6" },
-    { name: "Dermatology", patients: 199, pct: 16, color: "#60A5FA" },
-    { name: "Orthopedics", patients: 215, pct: 17, color: "#93C5FD" },
-  ];
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg">
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      {payload.map((entry) => (
+        <p key={entry.dataKey} className="text-sm font-semibold text-slate-900">
+          {entry.value.toLocaleString()}
+          <span className="ml-1 text-xs font-normal capitalize text-slate-400">{entry.dataKey}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
 
-  const doctorAvailability = [
-    { name: "Dr. Sarah Johnson", dept: "Cardiology", status: "Available", initials: "SJ" },
-    { name: "Dr. Michael Chang", dept: "Dermatology", status: "In session", initials: "MC" },
-    { name: "Dr. Amanda Lewis", dept: "Neurology", status: "Available", initials: "AL" },
-    { name: "Dr. James Okafor", dept: "Pediatrics", status: "Off duty", initials: "JO" },
-  ];
+function RangeToggle({ value, onChange, disabled, pendingKey }) {
+  return (
+    <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+      {RANGES.map((r) => {
+        const isActive = value === r.key;
+        const isPending = pendingKey === r.key;
+        return (
+          <button
+            key={r.key}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(r.key)}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all duration-150 disabled:cursor-not-allowed ${
+              isActive
+                ? "bg-white text-blue-600 shadow-sm ring-1 ring-slate-200"
+                : "text-slate-500 hover:text-slate-700 disabled:opacity-50"
+            }`}
+          >
+            {isPending && <Loader2 size={12} className="animate-spin" />}
+            {r.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
-  const initialAppointments = [
-    {
-      id: 1,
-      patientName: "Marcus Rossi",
-      patientPhone: "+1 (555) 019-2834",
-      initials: "MR",
-      doctor: "Dr. Sarah Johnson",
-      department: "Cardiology",
-      time: "09:00 AM",
-      status: "Confirmed",
-    },
-    {
-      id: 2,
-      patientName: "Emily Chen",
-      patientPhone: "+1 (555) 012-9921",
-      initials: "EC",
-      doctor: "Dr. Michael Chang",
-      department: "Dermatology",
-      time: "10:30 AM",
-      status: "Pending",
-    },
-    {
-      id: 3,
-      patientName: "Robert Taylor",
-      patientPhone: "+1 (555) 017-4402",
-      initials: "RT",
-      doctor: "Dr. Amanda Lewis",
-      department: "Neurology",                                                                                    
-      time: "11:15 AM",
-      status: "Completed",
-    },
-    {
-      id: 4,
-      patientName: "Sophia Martinez",
-      patientPhone: "+1 (555) 018-3310",
-      initials: "SM",
-      doctor: "Dr. Sarah Johnson",
-      department: "Cardiology",
-      time: "02:00 PM",
-      status: "Cancelled",
-    },
-  ];
+// Animated placeholder that echoes the shape of the real area/bar charts
+// so switching ranges doesn't cause a jarring blank flash.
+function ChartSkeleton({ variant = "area" }) {
+  const bars = [38, 58, 44, 72, 52, 84, 60, 46, 66, 50, 40, 30];
+  return (
+    <div className="flex h-full w-full animate-pulse flex-col justify-end gap-2 px-1 pb-6">
+      <div className="flex h-full items-end gap-2">
+        {bars.map((h, i) => (
+          <div
+            key={i}
+            className={`flex-1 rounded-t-md ${variant === "area" ? "bg-slate-100" : "bg-slate-150 bg-slate-100"}`}
+            style={{ height: `${h}%` }}
+          />
+        ))}
+      </div>
+      <div className="h-2 w-full rounded bg-slate-100" />
+    </div>
+  );
+}
 
-  const statusStyle = (status) => {
-    switch (status.toLowerCase()) {
-      case "confirmed":
-        return { bg: COLORS.tealSoft, fg: COLORS.tealDeep };
-      case "completed":
-        return { bg: COLORS.greenSoft, fg: "#136B48" };
-      case "pending":
-        return { bg: COLORS.amberSoft, fg: "#8C5A14" };
-      case "cancelled":
-        return { bg: COLORS.coralSoft, fg: "#A5342A" };
-      default:
-        return { bg: "#EEF0F3", fg: COLORS.slate };
+function StatCardSkeleton() {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
+        <div className="h-8 w-8 animate-pulse rounded-lg bg-slate-100" />
+      </div>
+      <div className="mt-5 h-7 w-20 animate-pulse rounded bg-slate-200" />
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const { user } = useAuth();
+  const [stats, setStats] = useState(null);
+  const [medicines, setMedicines] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [range, setRange] = useState("week");
+  const [rangeCache, setRangeCache] = useState({});
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeError, setRangeError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadDashboard() {
+      try {
+        setLoading(true);
+        const [dashboardRes, yearlyRes, weeklyRes, medicineRes] = await Promise.all([
+          dashboardService.getDashboard(),
+          dashboardService.getMonthly(),
+          dashboardService.getWeekly(),
+          medicineService.getAll(),
+        ]);
+
+        if (!mounted) return;
+
+        setStats(dashboardRes.data || {});
+        setMedicines(medicineRes.data || []);
+        setRangeCache((prev) => ({
+          ...prev,
+          week: weeklyRes.data || {},
+          year: yearlyRes.data || {},
+        }));
+      } catch (err) {
+        console.error("Failed to load dashboard", err);
+        if (mounted) setError("Dashboard data could not be loaded.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
+
+    loadDashboard();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Lazily fetch week/month breakdowns the first time each tab is selected.
+  const loadRange = useCallback(
+    async (key) => {
+      if (rangeCache[key]) return;
+
+      setRangeLoading(true);
+      setRangeError("");
+      try {
+        // Expects dashboardService.getWeekly() / getDailyThisMonth() to return
+        // { patients: [{ period, total }], appointments: [...], revenue: [...] }
+        // where `period` is 1-7 (Mon-Sun) for week, or day-of-month for month.
+        const res =
+          key === "week" ? await dashboardService.getWeekly() : await dashboardService.getDailyThisMonth();
+        setRangeCache((prev) => ({ ...prev, [key]: res.data || {} }));
+      } catch (err) {
+        console.error(`Failed to load ${key} stats`, err);
+        setRangeError(
+          `Couldn't load the ${key === "week" ? "weekly" : "monthly"} dashboard breakdown.`
+        );
+      } finally {
+        setRangeLoading(false);
+      }
+    },
+    [rangeCache]
+  );
+
+  const handleRangeChange = (key) => {
+    setRange(key);
+    loadRange(key);
   };
 
-  const filteredAppointments = useMemo(() => {
-    return initialAppointments.filter((app) => {
-      const q = searchTerm.toLowerCase();
-      return (
-        app.patientName.toLowerCase().includes(q) ||
-        app.doctor.toLowerCase().includes(q) ||
-        app.department.toLowerCase().includes(q)
-      );
-    });
-  }, [searchTerm]);
+  const pendingRangeKey = rangeLoading ? range : null;
+  const isChartLoading = rangeLoading && !rangeCache[range];
 
-  const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+  const chartData = useMemo(() => {
+    const data = rangeCache[range];
+
+    if (range === "year") {
+      const byMonth = Object.fromEntries(
+        months.map((name, index) => [index + 1, { label: name, patients: 0, appointments: 0, revenue: 0 }])
+      );
+      data?.patients?.forEach((item) => {
+        if (byMonth[item.month]) byMonth[item.month].patients = Number(item.total || 0);
+      });
+      data?.appointments?.forEach((item) => {
+        if (byMonth[item.month]) byMonth[item.month].appointments = Number(item.total || 0);
+      });
+      data?.revenue?.forEach((item) => {
+        if (byMonth[item.month]) byMonth[item.month].revenue = Number(item.total || 0);
+      });
+      return Object.values(byMonth);
+    }
+
+    if (range === "month") {
+      const now = new Date();
+      const total = daysInMonth(now.getFullYear(), now.getMonth() + 1);
+      const byDay = Object.fromEntries(
+        Array.from({ length: total }, (_, i) => [
+          i + 1,
+          { label: String(i + 1), patients: 0, appointments: 0, revenue: 0 },
+        ])
+      );
+      data?.patients?.forEach((item) => {
+        if (byDay[item.day]) byDay[item.day].patients = Number(item.total || 0);
+      });
+      data?.appointments?.forEach((item) => {
+        if (byDay[item.day]) byDay[item.day].appointments = Number(item.total || 0);
+      });
+      data?.revenue?.forEach((item) => {
+        if (byDay[item.day]) byDay[item.day].revenue = Number(item.total || 0);
+      });
+      return Object.values(byDay);
+    }
+
+    // range === "week"
+    const byDay = Object.fromEntries(
+      weekdays.map((name, index) => [index + 1, { label: name, patients: 0, appointments: 0, revenue: 0 }])
+    );
+    data?.patients?.forEach((item) => {
+      if (byDay[item.weekday]) byDay[item.weekday].patients = Number(item.total || 0);
+    });
+    data?.appointments?.forEach((item) => {
+      if (byDay[item.weekday]) byDay[item.weekday].appointments = Number(item.total || 0);
+    });
+    data?.revenue?.forEach((item) => {
+      if (byDay[item.weekday]) byDay[item.weekday].revenue = Number(item.total || 0);
+    });
+    return Object.values(byDay);
+  }, [rangeCache, range]);
+
+  const lowStock = medicines.filter((item) => Number(item.quantity) <= 10).slice(0, 5);
+  const recentAppointments = stats?.recent_appointments ?? [];
+
+  const cards = [
+    {
+      label: "Total patients",
+      value: (stats?.total_patients ?? 0).toLocaleString(),
+      icon: Users,
+      trend: stats?.total_patients_trend,
+      tint: "bg-blue-50 text-blue-600",
+    },
+    {
+      label: "Total doctors",
+      value: (stats?.total_doctors ?? 0).toLocaleString(),
+      icon: Stethoscope,
+      trend: stats?.total_doctors_trend,
+      tint: "bg-violet-50 text-violet-600",
+    },
+    {
+      label: "Appointments today",
+      value: (stats?.appointments_today ?? 0).toLocaleString(),
+      icon: Calendar,
+      trend: stats?.appointments_today_trend,
+      tint: "bg-amber-50 text-amber-600",
+    },
+    {
+      label: "Total revenue",
+      value: `$${Number(stats?.total_revenue || 0).toLocaleString()}`,
+      icon: Banknote,
+      trend: stats?.total_revenue_trend,
+      tint: "bg-emerald-50 text-emerald-600",
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <div className="h-7 w-40 animate-pulse rounded-md bg-slate-200" />
+            <div className="h-4 w-64 animate-pulse rounded bg-slate-100" />
+          </div>
+          <div className="h-10 w-36 animate-pulse rounded-lg bg-slate-100" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+        <div className="grid gap-4 xl:grid-cols-3">
+          <div className="h-80 animate-pulse rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
+            <ChartSkeleton variant="area" />
+          </div>
+          <div className="h-80 animate-pulse rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <ChartSkeleton variant="bar" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      style={{
-        background: COLORS.bg,
-        minHeight: "100vh",
-        fontFamily: "'Inter', sans-serif",
-        color: COLORS.ink,
-      }}
-      className="p-6 md:p-8 space-y-6"
-    >
-      <style>{FONTS}</style>
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-3">
-            <h1
-              style={{ fontWeight: 700 }}
-              className="text-3xl text-slate-900"
-            >
-              Dashboard
-            </h1>
-            <PulseBadge />
-          </div>
-          <p style={{ color: COLORS.slate }} className="text-sm mt-1">
-            {today} · Here is today's clinical overview.
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Welcome back{user?.name ? `, ${user.name}` : ""}. Here's your {user?.role ? `${user.role} ` : ""}
+            summary for today.
           </p>
         </div>
-        <button
-          onClick={onNavigateToAppointments}
-          style={{ background: COLORS.teal }}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 hover:opacity-90 text-white font-semibold text-sm rounded-lg shadow-sm transition-opacity"
-        >
-          <Plus size={18} />
-          <span>New appointment</span>
-        </button>
+        {can(user, "appointments", "create") && (
+          <Link
+            to="/appointments"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 hover:shadow"
+          >
+            <Plus size={18} />
+            New appointment
+          </Link>
+        )}
       </div>
 
-      <PulseDivider />
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+      )}
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, idx) => {
-          const Icon = stat.icon;
-          const TrendIcon =
-            stat.trend === "up" ? TrendingUp : stat.trend === "down" ? TrendingDown : Minus;
-          const trendColor =
-            stat.trend === "up" ? COLORS.green : stat.trend === "down" ? COLORS.coral : COLORS.slate;
-          const trendBg =
-            stat.trend === "up" ? COLORS.greenSoft : stat.trend === "down" ? COLORS.coralSoft : "#EEF0F3";
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map((card) => {
+          const Icon = card.icon;
           return (
             <div
-              key={idx}
-              style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}
-              className="p-5 rounded-xl shadow-sm flex flex-col justify-between"
+              key={card.label}
+              className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
             >
               <div className="flex items-center justify-between">
-                <span
-                  style={{ color: COLORS.slateLight, letterSpacing: "0.06em" }}
-                  className="text-[11px] font-bold uppercase"
-                >
-                  {stat.title}
-                </span>
-                <div
-                  style={{ background: stat.accentSoft, color: stat.accent }}
-                  className="p-2.5 rounded-lg"
-                >
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.label}</p>
+                <div className={`rounded-lg p-2 transition-transform duration-200 group-hover:scale-105 ${card.tint}`}>
                   <Icon size={18} />
                 </div>
               </div>
-
-              <div className="mt-4 flex items-baseline justify-between">
-                <div
-                  style={{ fontWeight: 700 }}
-                  className="text-[28px] leading-none text-slate-900"
-                >
-                  {stat.value}
-                </div>
-                <div
-                  style={{ background: trendBg, color: trendColor }}
-                  className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full"
-                >
-                  <TrendIcon size={12} className="mr-1" />
-                  <span>{stat.change}</span>
-                </div>
+              <div className="mt-4 flex items-end justify-between">
+                <p className="text-3xl font-bold text-slate-900">{card.value}</p>
+                <TrendBadge value={card.trend} />
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div
-          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}
-          className="lg:col-span-2 rounded-xl shadow-sm p-5"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2
-                style={{ fontWeight: 700 }}
-                className="text-base text-slate-900"
-              >
-                Patient visits
-              </h2>
-              <p style={{ color: COLORS.slate }} className="text-xs mt-0.5">
-                Volume trend across the last 6 months
-              </p>
-            </div>
-            <span
-              style={{ background: COLORS.tealSoft, color: COLORS.tealDeep }}
-              className="text-xs font-semibold px-3 py-1 rounded-full"
-            >
-              Last 6 months
-            </span>
-          </div>
-          <div style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={visitsData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="visitFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={COLORS.teal} stopOpacity={0.25} />
-                    <stop offset="100%" stopColor={COLORS.teal} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 12, fill: COLORS.slate, fontFamily: "IBM Plex Mono" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: COLORS.slateLight, fontFamily: "IBM Plex Mono" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={40}
-                />
-                <Tooltip content={<ChartTooltip unit=" visits" />} />
-                <Area
-                  type="monotone"
-                  dataKey="visits"
-                  stroke={COLORS.teal}
-                  strokeWidth={2.5}
-                  fill="url(#visitFill)"
-                  dot={{ r: 3, fill: COLORS.teal, strokeWidth: 0 }}
-                  activeDot={{ r: 5 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">Trends</h2>
+          <p className="text-xs text-slate-500">Patients, appointments and revenue</p>
         </div>
-
-        <div
-          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}
-          className="rounded-xl shadow-sm p-5"
-        >
-          <h2
-            style={{ fontWeight: 700 }}
-            className="text-base text-slate-900"
-          >
-            Revenue trend
-          </h2>
-          <p style={{ color: COLORS.slate }} className="text-xs mt-0.5 mb-4">
-            Quarterly revenue, in thousands
-          </p>
-          <div style={{ height: 190 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={revenueData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} vertical={false} />
-                <XAxis
-                  dataKey="quarter"
-                  tick={{ fontSize: 12, fill: COLORS.slate, fontFamily: "IBM Plex Mono" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: COLORS.slateLight, fontFamily: "IBM Plex Mono" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={36}
-                />
-                <Tooltip content={<ChartTooltip unit="K" />} cursor={{ fill: COLORS.tealSoft }} />
-                <Bar dataKey="revenue" radius={[6, 6, 0, 0]} fill={COLORS.teal} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <RangeToggle
+          value={range}
+          onChange={handleRangeChange}
+          disabled={rangeLoading}
+          pendingKey={pendingRangeKey}
+        />
       </div>
 
-      {/* Insights row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div
-          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}
-          className="rounded-xl shadow-sm p-5"
-        >
-          <h2
-            style={{ fontWeight: 700 }}
-            className="text-base text-slate-900 mb-4"
-          >
-            Department overview
-          </h2>
-          <div className="space-y-3.5">
-            {departments.map((d) => (
-              <div key={d.name}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-slate-700">{d.name}</span>
-                  <span
-                    style={{ fontFamily: "'IBM Plex Mono', monospace", color: COLORS.slate }}
-                    className="text-xs"
-                  >
-                    {d.patients} · {d.pct}%
-                  </span>
-                </div>
-                <div style={{ background: "#EEF0F3" }} className="h-1.5 rounded-full overflow-hidden">
-                  <div
-                    style={{ width: `${d.pct * 3}%`, background: d.color }}
-                    className="h-full rounded-full"
+      {rangeError && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          {rangeError}
+        </div>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md xl:col-span-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Patient visits</h2>
+              <p className="text-xs text-slate-500">
+                Patients and appointments{" "}
+                {range === "year" ? "over the year" : range === "month" ? "this month" : "this week"}
+              </p>
+            </div>
+            <div className="flex gap-3 text-xs font-medium text-slate-500">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-blue-500" /> Patients
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" /> Appointments
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 h-72">
+            {isChartLoading ? (
+              <ChartSkeleton variant="area" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="patientsFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2563eb" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="appointmentsFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#059669" stopOpacity={0.2} />
+                      <stop offset="100%" stopColor="#059669" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 12, fill: "#64748b" }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={range === "month" ? 2 : 0}
                   />
-                </div>
-              </div>
-            ))}
+                  <YAxis
+                    tick={{ fontSize: 12, fill: "#64748b" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={44}
+                    tickFormatter={compactNumber}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="patients"
+                    stroke="#2563eb"
+                    strokeWidth={2.5}
+                    fill="url(#patientsFill)"
+                    activeDot={{ r: 5 }}
+                    isAnimationActive
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="appointments"
+                    stroke="#059669"
+                    strokeWidth={2.5}
+                    fill="url(#appointmentsFill)"
+                    activeDot={{ r: 5 }}
+                    isAnimationActive
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        <div
-          style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}
-          className="rounded-xl shadow-sm p-5"
-        >
-          <h2
-            style={{ fontWeight: 700 }}
-            className="text-base text-slate-900 mb-4"
-          >
-            Doctor availability
-          </h2>
-          <div className="space-y-1">
-            {doctorAvailability.map((doc) => {
-              const s =
-                doc.status === "Available"
-                  ? { bg: COLORS.greenSoft, fg: "#136B48" }
-                  : doc.status === "In session"
-                  ? { bg: COLORS.amberSoft, fg: "#8C5A14" }
-                  : { bg: "#EEF0F3", fg: COLORS.slate };
-              return (
-                <div
-                  key={doc.name}
-                  className="flex items-center justify-between py-2.5"
-                  style={{ borderBottom: `1px solid ${COLORS.border}` }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      style={{ background: COLORS.tealSoft, color: COLORS.tealDeep }}
-                      className="w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center shrink-0"
-                    >
-                      {doc.initials}
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">{doc.name}</div>
-                      <div style={{ color: COLORS.slate }} className="text-xs">
-                        {doc.dept}
-                      </div>
-                    </div>
-                  </div>
-                  <span
-                    style={{ background: s.bg, color: s.fg }}
-                    className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                  >
-                    {doc.status}
-                  </span>
-                </div>
-              );
-            })}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+          <h2 className="text-base font-bold text-slate-900">Revenue</h2>
+          <p className="text-xs text-slate-500">
+            Revenue {range === "year" ? "this year" : range === "month" ? "this month" : "this week"}
+          </p>
+          <div className="mt-4 h-72">
+            {isChartLoading ? (
+              <ChartSkeleton variant="bar" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={range === "year" ? 1 : range === "month" ? 2 : 0}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12, fill: "#64748b" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={44}
+                    tickFormatter={compactNumber}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<ChartTooltip />} cursor={{ fill: "#f1f5f9" }} />
+                  <Bar dataKey="revenue" fill="#2563eb" radius={[6, 6, 0, 0]} maxBarSize={22} isAnimationActive />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div
-        style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}
-        className="p-4 rounded-xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4"
-      >
-        <div className="flex flex-1 items-center gap-3 w-full">
-          <div className="relative w-full sm:w-80">
-            <Search
-              size={16}
-              style={{ color: COLORS.slateLight }}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2"
-            />
-            <input
-              type="text"
-              placeholder="Search today's schedule..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}` }}
-              className="w-full pl-9 pr-4 py-2 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all"
-            />
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md xl:col-span-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-slate-900">Recent appointments</h2>
+            <Link to="/appointments" className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+              View all &rarr;
+            </Link>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          <button
-            style={{ border: `1px solid ${COLORS.border}`, color: COLORS.slate }}
-            className="p-2.5 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <SlidersHorizontal size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* Appointments table */}
-      <div
-        style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}
-        className="rounded-xl shadow-sm overflow-hidden"
-      >
-        <div
-          style={{ borderBottom: `1px solid ${COLORS.border}` }}
-          className="p-4 sm:p-6 flex items-center justify-between"
-        >
-          <div className="flex items-center gap-2.5">
-            <div>
-              <h2
-                style={{ fontWeight: 700 }}
-                className="text-base text-slate-900"
-              >
-                Today's schedule
-              </h2>
-              <p style={{ color: COLORS.slate }} className="text-xs mt-0.5">
-                Live updates for today's active appointments
-              </p>
+          {recentAppointments.length > 0 ? (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    <th className="pb-3 pr-4 font-semibold">Patient</th>
+                    <th className="pb-3 pr-4 font-semibold">Doctor</th>
+                    <th className="pb-3 pr-4 font-semibold">Time</th>
+                    <th className="pb-3 pr-4 font-semibold">Status</th>
+                    <th className="pb-3 font-semibold" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {recentAppointments.slice(0, 5).map((appt) => {
+                    const status = (appt.status || "").toLowerCase();
+                    return (
+                      <tr key={appt.id} className="text-slate-700 transition-colors hover:bg-slate-50">
+                        <td className="py-3 pr-4">
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
+                              {initialsOf(appt.patient_name)}
+                            </span>
+                            <span className="font-medium text-slate-900">{appt.patient_name}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4 text-slate-500">{appt.doctor_name}</td>
+                        <td className="py-3 pr-4 text-slate-500">{appt.time}</td>
+                        <td className="py-3 pr-4">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
+                              STATUS_STYLES[status] || STATUS_STYLES.completed
+                            }`}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                            {appt.status}
+                          </span>
+                        </td>
+                        <td className="py-3 text-right">
+                          <button
+                            type="button"
+                            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                            aria-label="More actions"
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <PulseBadge />
-          </div>
-          <button
-            onClick={onNavigateToAppointments}
-            style={{ color: COLORS.teal }}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold hover:opacity-80 transition-opacity"
-          >
-            <span>View all</span>
-            <ArrowRight size={14} />
-          </button>
+          ) : (
+            <p className="mt-6 text-sm text-slate-500">No recent appointments to show.</p>
+          )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr
-                style={{ background: "#FAFBFC", borderBottom: `1px solid ${COLORS.border}`, color: COLORS.slateLight }}
-                className="text-[11px] font-bold tracking-wider uppercase"
-              >
-                <th className="py-3.5 px-6">Patient</th>
-                <th className="py-3.5 px-6">Doctor</th>
-                <th className="py-3.5 px-6">Time</th>
-                <th className="py-3.5 px-6">Status</th>
-                <th className="py-3.5 px-6 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm">
-              {filteredAppointments.length === 0 ? (
-                <tr>
-                  <td colSpan="5" style={{ color: COLORS.slate }} className="py-12 text-center">
-                    No scheduled appointments found for today.
-                  </td>
-                </tr>
-              ) : (
-                filteredAppointments.map((item) => {
-                  const s = statusStyle(item.status);
-                  return (
-                    <tr
-                      key={item.id}
-                      style={{ borderTop: `1px solid ${COLORS.border}` }}
-                      className="hover:bg-slate-50/80 transition-colors"
-                    >
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div
-                            style={{ background: COLORS.tealSoft, color: COLORS.tealDeep }}
-                            className="w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center shrink-0"
-                          >
-                            {item.initials}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-slate-900">{item.patientName}</div>
-                            <div
-                              style={{ fontFamily: "'IBM Plex Mono', monospace", color: COLORS.slateLight }}
-                              className="text-xs"
-                            >
-                              {item.patientPhone}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-4 px-6">
-                        <div style={{ color: COLORS.teal }} className="font-semibold">
-                          {item.doctor}
-                        </div>
-                        <div style={{ color: COLORS.slateLight }} className="text-xs">
-                          {item.department}
-                        </div>
-                      </td>
-
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                          <Clock size={14} style={{ color: COLORS.slateLight }} />
-                          <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{item.time}</span>
-                        </div>
-                      </td>
-
-                      <td className="py-4 px-6">
-                        <span
-                          style={{ background: s.bg, color: s.fg }}
-                          className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold"
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-
-                      <td className="py-4 px-6 text-right relative">
-                        <button
-                          onClick={() => setActiveMenuId(activeMenuId === item.id ? null : item.id)}
-                          style={{ color: COLORS.slateLight }}
-                          className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-
-                        {activeMenuId === item.id && (
-                          <div
-                            style={{ border: `1px solid ${COLORS.border}` }}
-                            className="absolute right-6 top-12 w-32 bg-white rounded-lg shadow-lg py-1 z-20 text-left"
-                          >
-                            <button
-                              onClick={() => setActiveMenuId(null)}
-                              className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                              View details
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div
-          style={{ borderTop: `1px solid ${COLORS.border}` }}
-          className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-white"
-        >
-          <div style={{ color: COLORS.slate }} className="text-sm">
-            Showing <span className="font-semibold text-slate-800">1</span> to{" "}
-            <span className="font-semibold text-slate-800">{filteredAppointments.length}</span> of{" "}
-            <span className="font-semibold text-slate-800">{initialAppointments.length}</span> entries
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-slate-900">Inventory alerts</h2>
+            <Pill size={18} className="text-blue-600" />
           </div>
-
-          <div className="flex items-center gap-1">
-            <button
-              disabled
-              style={{ border: `1px solid ${COLORS.border}`, color: COLORS.slateLight }}
-              className="p-2 rounded-lg disabled:opacity-50 cursor-not-allowed"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              style={{ background: COLORS.teal }}
-              className="w-8 h-8 rounded-lg text-white font-bold text-xs flex items-center justify-center"
-            >
-              1
-            </button>
-            <button
-              style={{ border: `1px solid ${COLORS.border}`, color: COLORS.slate }}
-              className="p-2 rounded-lg hover:bg-slate-50"
-            >
-              <ChevronRight size={16} />
-            </button>
+          <div className="mt-4 space-y-3">
+            {lowStock.length > 0 ? (
+              lowStock.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 transition-colors hover:bg-amber-100/70"
+                >
+                  <p className="font-semibold text-slate-900">{item.name}</p>
+                  <p className="text-sm font-medium text-amber-700">
+                    {item.quantity} {item.unit || "units"}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-slate-500">No low-stock medicines right now.</p>
+            )}
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function ChartTooltip({ active, payload, label, unit }) {
-  if (!active || !payload || !payload.length) return null;
-  return (
-    <div
-      style={{
-        background: COLORS.ink,
-        color: "#fff",
-        padding: "6px 10px",
-        borderRadius: 6,
-        fontSize: 12,
-        fontFamily: "'IBM Plex Mono', monospace",
-      }}
-    >
-      <div style={{ opacity: 0.7, marginBottom: 2 }}>{label}</div>
-      <div style={{ fontWeight: 600 }}>
-        {payload[0].value}
-        {unit}
-      </div>
-    </div>
-  );
-}
-
-function PulseBadge() {
-  return (
-    <span
-      style={{ background: COLORS.greenSoft, color: "#136B48" }}
-      className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-full"
-    >
-      <span style={{ position: "relative", width: 6, height: 6, display: "inline-block" }}>
-        <span
-          style={{
-            position: "absolute",
-            inset: 0,
-            borderRadius: "50%",
-            background: COLORS.green,
-            animation: "pulseDot 1.6s ease-out infinite",
-          }}
-        />
-        <span
-          style={{
-            position: "absolute",
-            inset: 0,
-            borderRadius: "50%",
-            background: COLORS.green,
-          }}
-        />
-      </span>
-      Live
-      <style>{`@keyframes pulseDot { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(3.2); opacity: 0; } }`}</style>
-    </span>
-  );
-}
-
-function PulseDivider() {
-  return (
-    <div style={{ width: "100%", height: 22, overflow: "hidden" }}>
-      <svg width="100%" height="22" viewBox="0 0 1200 22" preserveAspectRatio="none">
-        <line x1="0" y1="11" x2="1200" y2="11" stroke={COLORS.border} strokeWidth="1" />
-        <polyline
-          points="0,11 480,11 510,11 525,2 540,20 555,4 570,11 600,11 1200,11"
-          fill="none"
-          stroke={COLORS.teal}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
     </div>
   );
 }

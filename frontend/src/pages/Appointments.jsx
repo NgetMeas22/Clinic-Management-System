@@ -12,10 +12,13 @@ import {
 
 import { getPatients } from "../services/patientService";
 import { getDoctors } from "../services/doctorService";
+import { useAuth } from "../context/AuthContext";
+import { can } from "../utils/permissions";
 
 /* eslint-disable react-hooks/set-state-in-effect */
 
 const Appointments = () => {
+    const { user } = useAuth();
     // =========================
     // State
     // =========================
@@ -31,6 +34,9 @@ const Appointments = () => {
     const [selectedAppointment, setSelectedAppointment] = useState(null);
 
     const [loading, setLoading] = useState(false);
+    const canCreate = can(user, "appointments", "create");
+    const canUpdate = can(user, "appointments", "update");
+    const canDelete = can(user, "appointments", "delete");
 
     // =========================
     // Load Appointments
@@ -39,7 +45,7 @@ const Appointments = () => {
     const loadAppointments = useCallback(async () => {
         try {
             const response = await getAppointments({ search, status });
-            setAppointments(response.data?.data || []);
+            setAppointments(response.data?.data?.data || response.data?.data || []);
         } catch (error) {
             console.error("Failed to load appointments:", error);
         }
@@ -52,7 +58,7 @@ const Appointments = () => {
     const loadPatients = async () => {
         try {
             const response = await getPatients();
-            setPatients(response.data?.data || []);
+            setPatients(response.data?.data?.data || response.data?.data || []);
         } catch (error) {
             console.error("Failed to load patients:", error);
         }
@@ -61,7 +67,7 @@ const Appointments = () => {
     const loadDoctors = async () => {
         try {
             const response = await getDoctors();
-            setDoctors(response.data?.data || []);
+            setDoctors(response.data?.data?.data || response.data?.data || []);
         } catch (error) {
             console.error("Failed to load doctors:", error);
         }
@@ -151,21 +157,23 @@ const Appointments = () => {
                 setSearch={setSearch}
                 status={status}
                 setStatus={setStatus}
-                onNewAppointment={handleCreate}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
+                onAdd={canCreate ? handleCreate : null}
+                onEdit={canUpdate ? handleEdit : null}
+                onDelete={canDelete ? handleDelete : null}
             />
 
             {/* Appointment Modal */}
-            <AppointmentModal
-                isOpen={isModalOpen}
-                onClose={handleCloseModal}
-                patients={patients}
-                doctors={doctors}
-                appointment={selectedAppointment}
-                onSubmit={handleSubmit}
-                loading={loading}
-            />
+            {(canCreate || canUpdate) && (
+                <AppointmentModal
+                    isOpen={isModalOpen}
+                    onClose={handleCloseModal}
+                    patients={patients}
+                    doctors={doctors}
+                    appointment={selectedAppointment}
+                    onSubmit={handleSubmit}
+                    loading={loading}
+                />
+            )}
         </div>
     );
 };
