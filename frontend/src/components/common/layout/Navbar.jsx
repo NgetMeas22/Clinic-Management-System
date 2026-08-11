@@ -71,9 +71,9 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic" }) {
 
           {/* User Profile */}
           <div className="flex items-center gap-2.5 pl-1 sm:pl-2">
-            <div className="relative w-9 h-9 rounded-full overflow-hidden ring-2 ring-blue-500 shrink-0">
+            <div className="relative w-9 h-9 rounded-full overflow-hidden ring-2 ring-gray-300 shrink-0">
             <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150"
+              src="https://i.pinimg.com/736x/07/fb/34/07fb3452c4640d881a16d08c2e314f3e.jpg"
                 alt={user?.name || "User"}
                 className="w-full h-full object-cover"
               />

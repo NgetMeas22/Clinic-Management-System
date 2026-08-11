@@ -9,15 +9,18 @@ class Payment extends Model
 {
     use HasFactory;
 
-      protected $fillable = [
+    protected $fillable = [
         'patient_id',
         'appointment_id',
         'amount',
         'payment_method',
         'payment_status',
-        'transaction_code',
         'payment_date',
-        'notes',
+    ];
+
+    protected $casts = [
+        'amount' => 'decimal:2',
+        'payment_date' => 'date',
     ];
 
     public function patient()
