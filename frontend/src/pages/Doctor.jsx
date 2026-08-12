@@ -13,6 +13,10 @@ import {
   User,
   Save,
   ChevronDown,
+  Phone,
+  Mail,
+  BadgeCheck,
+  Camera,
 } from "lucide-react";
 import {
   getDoctors,
@@ -38,22 +42,32 @@ export default function Doctors() {
   const [submitting, setSubmitting] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState(null);
 
+  // Department List mapping with IDs
+  const departmentList = [
+    { id: 1, name: "Cardiology" },
+    { id: 2, name: "Neurology" },
+    { id: 3, name: "Pediatrics" },
+    { id: 4, name: "Orthopedics" },
+    { id: 5, name: "General Medicine" },
+  ];
+
   const initialFormState = {
     name: "",
     doctor_code: "",
     phone: "",
     email: "",
-    department: "",
-    department_id: "",
-    specialization: "",
+    department: departmentList[0].name,
+    department_id: departmentList[0].id,
+    specialization: "General Practitioner",
     license_number: "",
     gender: "male",
     date_of_birth: "",
     address: "",
-    status: "Active",
+    status: "active",
     avatar: "",
     bio: "",
   };
+
   const [formData, setFormData] = useState(initialFormState);
   const canCreate = can(user, "doctors", "create");
   const canUpdate = can(user, "doctors", "update");
@@ -72,11 +86,11 @@ export default function Doctors() {
     "Oncologist",
   ];
 
-  const departmentOptions = [
-    "Cardiology",
-    "Neurology",
-    "Pediatrics",
-    "Orthopedics",
+  // Must match the backend's `doctors.status` ENUM('active', 'inactive') exactly —
+  // sending "Active" or "On Leave" causes a MySQL truncation error (500).
+  const statusOptions = [
+    { value: "active", label: "Active" },
+    { value: "inactive", label: "Inactive" },
   ];
 
   const BIO_MAX_LENGTH = 500;
@@ -120,7 +134,30 @@ export default function Doctors() {
   }, []);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    // If Department changes, keep department_id and department name in sync
+    if (name === "department_id") {
+      const selectedDept = departmentList.find((d) => String(d.id) === String(value));
+      setFormData((prev) => ({
+        ...prev,
+        department_id: value,
+        department: selectedDept ? selectedDept.name : prev.department,
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  // Reads a selected image file and stores it as a data URL for preview + upload
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFormData((prev) => ({ ...prev, avatar: reader.result }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleOpenAddModal = () => {
@@ -130,20 +167,23 @@ export default function Doctors() {
   };
 
   const handleOpenEditModal = (doctor) => {
+    const deptName = getDepartmentName(doctor);
+    const matchedDept = departmentList.find((d) => d.name.toLowerCase() === deptName.toLowerCase());
+
     setEditingDoctorId(doctor.id);
     setFormData({
       name: doctor.user?.name || doctor.name || doctor.full_name || "",
       doctor_code: doctor.doctor_code || doctor.code || "",
       phone: doctor.user?.phone || doctor.phone || "",
       email: doctor.user?.email || doctor.email || "",
-      department: getDepartmentName(doctor) || "Cardiology",
-      department_id: doctor.department_id || doctor.department?.id || "1",
-      specialization: doctor.specialization || doctor.speciality || "",
+      department: deptName,
+      department_id: doctor.department_id || doctor.department?.id || (matchedDept ? matchedDept.id : 1),
+      specialization: doctor.specialization || doctor.speciality || "General Practitioner",
       license_number: doctor.license_number || "",
       gender: doctor.gender || "male",
       date_of_birth: doctor.date_of_birth || "",
       address: doctor.address || "",
-      status: doctor.status || "Active",
+      status: (doctor.status || "active").toLowerCase(),
       avatar: doctor.avatar || doctor.image || "",
       bio: doctor.bio || doctor.description || "",
     });
@@ -154,26 +194,41 @@ export default function Doctors() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
+
+    // Make sure department_id is sent as a Number to the Laravel API
+    const payload = {
+      ...formData,
+      department_id: Number(formData.department_id) || 1,
+    };
+
     try {
       if (editingDoctorId) {
-        const response = await updateDoctor(editingDoctorId, formData);
+        const response = await updateDoctor(editingDoctorId, payload);
         const updatedDoc = response.data?.data || response.data;
         setDoctors((prev) =>
           prev.map((doc) =>
-            doc.id === editingDoctorId ? { ...doc, ...formData, ...updatedDoc } : doc
+            doc.id === editingDoctorId ? { ...doc, ...payload, ...updatedDoc } : doc
           )
         );
       } else {
-        const response = await createDoctor(formData);
+        const response = await createDoctor(payload);
         const newDoctor = response.data?.data || response.data;
-        setDoctors((prev) => [{ ...formData, id: newDoctor.id || Date.now(), ...newDoctor }, ...prev]);
+        setDoctors((prev) => [{ ...payload, id: newDoctor.id || Date.now(), ...newDoctor }, ...prev]);
       }
 
       setIsModalOpen(false);
       setFormData(initialFormState);
     } catch (error) {
       console.error("Error saving doctor:", error);
-      alert(error.response?.data?.message || "Failed to save doctor details.");
+
+      // Surface a detailed Laravel validation message when available
+      const valErrors = error.response?.data?.errors;
+      if (valErrors) {
+        const firstMsg = Object.values(valErrors)[0][0];
+        alert(`Validation Error: ${firstMsg}`);
+      } else {
+        alert(error.response?.data?.message || "Failed to save doctor details. Check server logs.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -188,6 +243,7 @@ export default function Doctors() {
       setDoctors((prev) => prev.filter((doctor) => doctor.id !== id));
     } catch (error) {
       console.error("Error deleting doctor:", error);
+      alert(error.response?.data?.message || "Failed to delete doctor.");
     }
   };
 
@@ -217,8 +273,11 @@ export default function Doctors() {
 
   if (loading) {
     return (
-      <div className="p-8 text-center text-slate-500 font-medium">
-        Loading doctors...
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-medium text-slate-500">Loading doctors...</p>
+        </div>
       </div>
     );
   }
@@ -236,7 +295,7 @@ export default function Doctors() {
         {canCreate && (
           <button
             onClick={handleOpenAddModal}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm shadow-blue-600/20 transition-colors"
           >
             <UserPlus size={18} />
             <span>Add New Doctor</span>
@@ -270,10 +329,11 @@ export default function Doctors() {
               className="w-full sm:w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="All Departments">All Departments</option>
-              <option value="Cardiology">Cardiology</option>
-              <option value="Neurology">Neurology</option>
-              <option value="Pediatrics">Pediatrics</option>
-              <option value="Orthopedics">Orthopedics</option>
+              {departmentList.map((dept) => (
+                <option key={dept.id} value={dept.name}>
+                  {dept.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -305,8 +365,11 @@ export default function Doctors() {
             <tbody className="divide-y divide-slate-100 text-sm">
               {filteredDoctors.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="py-12 text-center text-slate-500">
-                    No doctors found matching criteria.
+                  <td colSpan="5" className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <User size={28} />
+                      <p className="text-slate-500 font-medium">No doctors found matching criteria.</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -319,14 +382,15 @@ export default function Doctors() {
                   const code = doc.doctor_code || doc.code || `ID: DOC-${4090 + doc.id}`;
                   const specialization =
                     doc.specialization || doc.speciality || "General Practitioner";
-                  // FIX: doc.department can be an object ({id, name, description, status, ...})
+                  // doc.department can be an object ({id, name, description, status, ...})
                   // instead of a plain string. Extract the name safely so React never tries
                   // to render an object directly.
                   const department = getDepartmentName(doc);
-                  const status = doc.status || "Active";
+                  const rawStatus = doc.status || "active";
+                  const status = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
 
-                  const isActive = status.toLowerCase() === "active";
-                  const isOnLeave = status.toLowerCase().includes("leave");
+                  const isActive = rawStatus.toLowerCase() === "active";
+                  const isOnLeave = rawStatus.toLowerCase().includes("leave");
 
                   return (
                     <tr
@@ -340,10 +404,10 @@ export default function Doctors() {
                             <img
                               src={doc.avatar}
                               alt={name}
-                              className="w-10 h-10 rounded-full object-cover shrink-0"
+                              className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-slate-200"
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                            <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-400 shrink-0">
                               <User size={20} />
                             </div>
                           )}
@@ -371,14 +435,19 @@ export default function Doctors() {
                       {/* Status */}
                       <td className="py-4 px-6">
                         <span
-                          className={`inline-flex items-center px-3 py-1 rounded text-xs font-semibold ${
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
                             isActive
-                              ? "bg-blue-100 text-blue-700"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                               : isOnLeave
-                              ? "bg-rose-50 text-rose-600 border border-rose-300"
-                              : "bg-slate-100 text-slate-600"
+                              ? "bg-amber-50 text-amber-700 border border-amber-200"
+                              : "bg-slate-100 text-slate-600 border border-slate-200"
                           }`}
                         >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              isActive ? "bg-emerald-500" : isOnLeave ? "bg-amber-500" : "bg-slate-400"
+                            }`}
+                          />
                           {status}
                         </span>
                       </td>
@@ -398,7 +467,7 @@ export default function Doctors() {
 
                         {/* Dropdown Menu */}
                         {activeMenuId === doc.id && (
-                          <div className="absolute right-6 top-12 w-32 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20 text-left">
+                          <div className="absolute right-6 top-12 w-36 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20 text-left">
                             {canUpdate && (
                               <button
                                 onClick={() => handleOpenEditModal(doc)}
@@ -473,10 +542,10 @@ export default function Doctors() {
 
       {/* Add / Edit Doctor Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-y-auto max-h-[90vh]">
             {/* Modal Header */}
-            <div className="flex justify-between items-start px-6 pt-6 pb-4 border-b border-slate-100">
+            <div className="flex justify-between items-start px-6 pt-6 pb-4 border-b border-slate-100 sticky top-0 bg-white z-10">
               <div>
                 <h3 className="text-xl font-bold text-slate-900">
                   {editingDoctorId ? "Edit Doctor" : "Add New Doctor"}
@@ -489,37 +558,116 @@ export default function Doctors() {
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleSubmit}>
-              <div className="p-6">
+              <div className="p-6 space-y-5">
+                {/* Identity Card: avatar + name + code */}
+                <div className="border border-slate-200 rounded-xl p-6">
+                  <h4 className="text-sm font-bold text-slate-900 pb-4 mb-5 border-b border-slate-100 flex items-center gap-2">
+                    <User size={15} className="text-blue-600" />
+                    Identity
+                  </h4>
+
+                  <div className="flex flex-col sm:flex-row gap-5">
+                    {/* Avatar upload */}
+                    <div className="flex flex-col items-center gap-2 shrink-0">
+                      <label className="relative cursor-pointer group">
+                        {formData.avatar ? (
+                          <img
+                            src={formData.avatar}
+                            alt="Avatar preview"
+                            className="w-20 h-20 rounded-full object-cover ring-2 ring-slate-200"
+                          />
+                        ) : (
+                          <div className="w-20 h-20 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                            <User size={28} />
+                          </div>
+                        )}
+                        <span className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center ring-2 ring-white group-hover:bg-blue-700 transition-colors">
+                          <Camera size={13} />
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarChange}
+                          className="hidden"
+                        />
+                      </label>
+                      <span className="text-xs text-slate-400 font-medium">Photo</span>
+                    </div>
+
+                    <div className="flex-1 space-y-4">
+                      {/* Full Name */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Full Name
+                        </label>
+                        <input
+                          type="text"
+                          name="name"
+                          required
+                          value={formData.name}
+                          onChange={handleChange}
+                          className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                          placeholder="Dr. Jane Doe"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Gender */}
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                            Gender
+                          </label>
+                          <div className="relative">
+                            <select
+                              name="gender"
+                              value={formData.gender}
+                              onChange={handleChange}
+                              className="w-full appearance-none border border-slate-300 rounded-lg p-2.5 pr-9 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white"
+                            >
+                              <option value="male">Male</option>
+                              <option value="female">Female</option>
+                              <option value="other">Other</option>
+                            </select>
+                            <ChevronDown
+                              size={16}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Date of Birth */}
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                            Date of Birth
+                          </label>
+                          <input
+                            type="date"
+                            name="date_of_birth"
+                            value={formData.date_of_birth}
+                            onChange={handleChange}
+                            className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Professional Information Card */}
                 <div className="border border-slate-200 rounded-xl p-6">
-                  <h4 className="text-sm font-bold text-slate-900 pb-4 mb-5 border-b border-slate-100">
+                  <h4 className="text-sm font-bold text-slate-900 pb-4 mb-5 border-b border-slate-100 flex items-center gap-2">
+                    <BadgeCheck size={15} className="text-blue-600" />
                     Professional Information
                   </h4>
 
                   <div className="space-y-5">
-                    {/* Full Name */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Full Name
-                      </label>
-                      <input
-                        type="text"
-                        name="name"
-                        required
-                        value={formData.name}
-                        onChange={handleChange}
-                        className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                        placeholder="Dr. Jane Doe"
-                      />
-                    </div>
-
                     {/* Specialization & Department */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
@@ -552,15 +700,14 @@ export default function Doctors() {
                         </label>
                         <div className="relative">
                           <select
-                            name="department"
-                            value={formData.department}
+                            name="department_id"
+                            value={formData.department_id}
                             onChange={handleChange}
                             className="w-full appearance-none border border-slate-300 rounded-lg p-2.5 pr-9 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white"
                           >
-                            <option value="">Select Department</option>
-                            {departmentOptions.map((dept) => (
-                              <option key={dept} value={dept}>
-                                {dept}
+                            {departmentList.map((dept) => (
+                              <option key={dept.id} value={dept.id}>
+                                {dept.name}
                               </option>
                             ))}
                           </select>
@@ -572,43 +719,117 @@ export default function Doctors() {
                       </div>
                     </div>
 
-                    {/* Contact Number & Email */}
+                    {/* License & Status */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          License Number
+                        </label>
+                        <input
+                          type="text"
+                          name="license_number"
+                          value={formData.license_number}
+                          onChange={handleChange}
+                          className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                          placeholder="e.g. MD-102938"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Status
+                        </label>
+                        <div className="relative">
+                          <select
+                            name="status"
+                            value={formData.status}
+                            onChange={handleChange}
+                            className="w-full appearance-none border border-slate-300 rounded-lg p-2.5 pr-9 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white"
+                          >
+                            {statusOptions.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown
+                            size={16}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact Information Card */}
+                <div className="border border-slate-200 rounded-xl p-6">
+                  <h4 className="text-sm font-bold text-slate-900 pb-4 mb-5 border-b border-slate-100 flex items-center gap-2">
+                    <Phone size={15} className="text-blue-600" />
+                    Contact Information
+                  </h4>
+
+                  <div className="space-y-5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1.5">
                           Contact Number
                         </label>
-                        <input
-                          type="text"
-                          name="phone"
-                          required
-                          value={formData.phone}
-                          onChange={handleChange}
-                          className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                          placeholder="+1 (555) 000-0000"
-                        />
+                        <div className="relative">
+                          <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            name="phone"
+                            required
+                            value={formData.phone}
+                            onChange={handleChange}
+                            className="w-full border border-slate-300 rounded-lg p-2.5 pl-9 text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                            placeholder="+1 (555) 000-0000"
+                          />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1.5">
                           Email Address
                         </label>
-                        <input
-                          type="email"
-                          name="email"
-                          required
-                          value={formData.email}
-                          onChange={handleChange}
-                          className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                          placeholder="doctor@ngmclinic.com"
-                        />
+                        <div className="relative">
+                          <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="email"
+                            name="email"
+                            required
+                            value={formData.email}
+                            onChange={handleChange}
+                            className="w-full border border-slate-300 rounded-lg p-2.5 pl-9 text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                            placeholder="doctor@ngmclinic.com"
+                          />
+                        </div>
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Address
+                      </label>
+                      <input
+                        type="text"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleChange}
+                        className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        placeholder="Street, city, country"
+                      />
                     </div>
 
                     {/* Brief Bio */}
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Brief Bio
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-bold text-slate-700">
+                          Brief Bio
+                        </label>
+                        <span className="text-xs text-slate-400 font-medium">
+                          {formData.bio.length}/{BIO_MAX_LENGTH}
+                        </span>
+                      </div>
                       <textarea
                         name="bio"
                         rows={4}
@@ -618,27 +839,24 @@ export default function Doctors() {
                         className="w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-none"
                         placeholder="Provide a short professional background..."
                       />
-                      <p className="text-xs text-slate-400 mt-1">
-                        Maximum {BIO_MAX_LENGTH} characters.
-                      </p>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="flex justify-end items-center gap-6 px-6 py-4 border-t border-slate-100">
+              <div className="flex justify-end items-center gap-6 px-6 py-4 border-t border-slate-100 sticky bottom-0 bg-white">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+                  className="text-sm font-semibold text-slate-500 hover:text-slate-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm shadow-blue-600/20 disabled:opacity-50 transition-colors"
                 >
                   <Save size={16} />
                   <span>

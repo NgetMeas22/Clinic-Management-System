@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   Search,
   SlidersHorizontal,
@@ -10,6 +10,7 @@ import {
   Pencil,
   Trash2,
   X,
+  Users,
 } from "lucide-react";
 import {
   getPatients,
@@ -20,16 +21,35 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { can } from "../utils/permissions";
 
-// Helper to calculate age from DOB
+// ---------- Helpers ----------
+
+// Calculate age from a date of birth
 const calculateAge = (dob) => {
   if (!dob) return null;
   const birthDate = new Date(dob);
-  const difference = Date.now() - birthDate.getTime();
-  const ageDate = new Date(difference);
-  return Math.abs(ageDate.getUTCFullYear() - 1970);
+  if (Number.isNaN(birthDate.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
 };
 
-// Helper for avatar initials
+// Normalize any incoming date value to YYYY-MM-DD (what <input type="date"> and most APIs expect)
+const toISODateString = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  // Use local date parts so we don't shift a day due to UTC conversion
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// Avatar initials
 const getInitials = (firstName, lastName, name) => {
   if (firstName || lastName) {
     return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
@@ -44,32 +64,61 @@ const getInitials = (firstName, lastName, name) => {
   return "PT";
 };
 
+// Deterministic soft accent color per patient, based on id/name — for a bit of visual variety
+const AVATAR_PALETTE = [
+  { bg: "bg-blue-100", text: "text-blue-600" },
+  { bg: "bg-violet-100", text: "text-violet-600" },
+  { bg: "bg-teal-100", text: "text-teal-600" },
+  { bg: "bg-amber-100", text: "text-amber-600" },
+  { bg: "bg-rose-100", text: "text-rose-600" },
+];
+const getAvatarColor = (key) => {
+  const str = String(key ?? "");
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) % AVATAR_PALETTE.length;
+  return AVATAR_PALETTE[Math.abs(hash)];
+};
+
+// NOTE: these values are constrained by the DB schema:
+//   gender ENUM('male','female','other')
+//   status ENUM('active','inactive')
+// Sending anything outside these exact lowercase values (e.g. "Active",
+// "Discharged") causes a 500 on the API since MySQL rejects the enum value.
+const initialFormState = {
+  patient_code: "",
+  first_name: "",
+  last_name: "",
+  gender: "female",
+  date_of_birth: "",
+  blood_group: "",
+  phone: "",
+  email: "",
+  address: "",
+  emergency_contact: "",
+  emergency_phone: "",
+  status: "active",
+};
+
+const STATUS_OPTIONS = ["active", "inactive"];
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
 export default function Patients() {
   const { user } = useAuth();
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Search & Filter State
+  // Search & filter state
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Patients");
 
-  // Modal & Form States
+  // Modal & form state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPatientId, setEditingPatientId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState(null);
   const [activeMenuId, setActiveMenuId] = useState(null);
+  const menuRef = useRef(null);
 
-  const initialFormState = {
-    patient_code: "",
-    first_name: "",
-    last_name: "",
-    gender: "female",
-    phone: "",
-    email: "",
-    date_of_birth: "",
-    address: "",
-    status: "Active",
-  };
   const [formData, setFormData] = useState(initialFormState);
   const canCreate = can(user, "patients", "create");
   const canUpdate = can(user, "patients", "update");
@@ -94,64 +143,101 @@ export default function Patients() {
         console.error("Error fetching patients:", error);
         if (isMounted) setPatients([]);
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchPatients();
-
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // Handle Input Change
+  // Close the row action menu when clicking outside of it
+  useEffect(() => {
+    if (!activeMenuId) return;
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setActiveMenuId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [activeMenuId]);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Open Modal for Creating Patient
   const handleOpenAddModal = () => {
     setEditingPatientId(null);
     setFormData(initialFormState);
+    setFormErrors(null);
     setIsModalOpen(true);
   };
 
-  // Open Modal for Editing Patient
   const handleOpenEditModal = (patient) => {
     setEditingPatientId(patient.id);
     setFormData({
       patient_code: patient.patient_code || "",
       first_name: patient.first_name || patient.name?.split(" ")[0] || "",
       last_name:
-        patient.last_name ||
-        patient.name?.split(" ").slice(1).join(" ") ||
-        "",
+        patient.last_name || patient.name?.split(" ").slice(1).join(" ") || "",
       gender: patient.gender ? patient.gender.toLowerCase() : "female",
+      date_of_birth: toISODateString(patient.date_of_birth) || "",
+      blood_group: patient.blood_group || "",
       phone: patient.phone || "",
       email: patient.email || "",
-      date_of_birth: patient.date_of_birth || "",
       address: patient.address || "",
-      status: patient.status || "Active",
+      emergency_contact: patient.emergency_contact || "",
+      emergency_phone: patient.emergency_phone || "",
+      status: patient.status ? patient.status.toLowerCase() : "active",
     });
+    setFormErrors(null);
     setIsModalOpen(true);
     setActiveMenuId(null);
   };
 
-  // Submit Form (Add / Edit)
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setFormErrors(null);
+  };
+
+  // ---------- Submit (create / update) ----------
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
+    setFormErrors(null);
 
+    // Basic client-side guard before hitting the API
+    if (!formData.first_name.trim() || !formData.last_name.trim()) {
+      setFormErrors("First name and last name are required.");
+      return;
+    }
+
+    // Build a payload that matches the `patients` table exactly:
+    //   gender ENUM('male','female','other')
+    //   status ENUM('active','inactive')
+    // Both must be sent lowercase or MySQL rejects the insert/update with a 500.
     const payload = {
-      ...formData,
-      name: `${formData.first_name} ${formData.last_name}`.trim(),
       patient_code:
-        formData.patient_code || `PT-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        formData.patient_code ||
+        (editingPatientId
+          ? patients.find((p) => p.id === editingPatientId)?.patient_code
+          : `PT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`),
+      first_name: formData.first_name.trim(),
+      last_name: formData.last_name.trim(),
+      gender: formData.gender.toLowerCase(),
+      date_of_birth: toISODateString(formData.date_of_birth),
+      blood_group: formData.blood_group || null,
+      phone: formData.phone.trim() || null,
+      email: formData.email.trim() || null,
+      address: formData.address.trim() || null,
+      emergency_contact: formData.emergency_contact.trim() || null,
+      emergency_phone: formData.emergency_phone.trim() || null,
+      status: formData.status.toLowerCase(),
     };
 
+    setSubmitting(true);
     try {
       if (editingPatientId) {
         const response = await updatePatient(editingPatientId, payload);
@@ -164,43 +250,55 @@ export default function Patients() {
       } else {
         const response = await createPatient(payload);
         const newPatient = response.data?.data || response.data;
-        setPatients((prev) => [{ ...payload, id: newPatient.id || Date.now(), ...newPatient }, ...prev]);
+        setPatients((prev) => [
+          { ...payload, id: newPatient?.id || Date.now(), ...newPatient },
+          ...prev,
+        ]);
       }
 
       setIsModalOpen(false);
       setFormData(initialFormState);
     } catch (error) {
-      console.error("Error saving patient:", error.response?.data);
+      // Log the full response so the real backend validation/SQL error is visible
+      // in devtools instead of just "Request failed with status code 500".
+      console.error("Error saving patient:", error.response?.data || error.message || error);
+
+      const data = error.response?.data;
       const serverMessage =
-        error.response?.data?.message ||
-        (error.response?.data?.errors
-          ? Object.values(error.response.data.errors).flat().join("\n")
+        data?.message ||
+        (data?.errors ? Object.values(data.errors).flat().join(" ") : null) ||
+        (error.response?.status === 500
+          ? "Server error (500). Check the browser console and API logs — this usually means a field value doesn't match what the database expects (e.g. an enum column)."
           : null);
 
-      alert(serverMessage || "Failed to save patient details.");
+      setFormErrors(serverMessage || "Failed to save patient details. Please check the form and try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Delete Patient
   const handleDelete = async (id) => {
     setActiveMenuId(null);
     const confirmDelete = window.confirm(
-      "Are you sure you want to delete this patient record?"
+      "Are you sure you want to delete this patient record? This action cannot be undone."
     );
-
     if (!confirmDelete) return;
 
     try {
       await deletePatient(id);
-      setPatients((prevPatients) => prevPatients.filter((p) => p.id !== id));
+      setPatients((prev) => prev.filter((p) => p.id !== id));
     } catch (error) {
-      console.error("Error deleting patient:", error);
+      console.error("Error deleting patient:", error.response?.data || error.message || error);
+      const message =
+        error.response?.data?.message ||
+        (error.response?.status === 500
+          ? "Server error (500). This patient likely has related records (appointments, records, etc.) that need to be removed first, or the delete failed on the server — check the API logs."
+          : "Failed to delete patient. Please try again.");
+      alert(message);
     }
   };
 
-  // Filter Patients
+  // ---------- Derived data ----------
   const filteredPatients = useMemo(() => {
     return patients.filter((patient) => {
       const fullName = (
@@ -213,7 +311,7 @@ export default function Patients() {
       const matchesSearch =
         fullName.includes(search) || code.includes(search) || phone.includes(search);
 
-      const patientStatus = patient.status || "Active";
+      const patientStatus = patient.status || "active";
       const matchesStatus =
         statusFilter === "All Patients" ||
         patientStatus.toLowerCase() === statusFilter.toLowerCase();
@@ -222,28 +320,36 @@ export default function Patients() {
     });
   }, [patients, searchTerm, statusFilter]);
 
+  const activeCount = useMemo(
+    () => patients.filter((p) => (p.status || "active").toLowerCase() === "active").length,
+    [patients]
+  );
+
   if (loading) {
     return (
-      <div className="p-8 text-center text-slate-500 font-medium">
-        Loading patients...
+      <div className="flex items-center justify-center min-h-[60vh] text-slate-500">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
+          <span className="text-sm font-medium">Loading patients…</span>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="p-6 md:p-8 bg-slate-50 min-h-screen space-y-6">
-      {/* Top Header */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Patients</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Manage patient records, appointments, and medical history.
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Patients</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            {patients.length} total &middot; {activeCount} active
           </p>
         </div>
         {canCreate && (
           <button
             onClick={handleOpenAddModal}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-lg shadow-sm shadow-blue-600/20 transition-colors"
           >
             <Plus size={18} strokeWidth={2.5} />
             <span>Add New Patient</span>
@@ -251,55 +357,47 @@ export default function Patients() {
         )}
       </div>
 
-      {/* Filter / Search Bar Container */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex flex-1 flex-col sm:flex-row items-center gap-3 w-full">
-          {/* Search Box */}
+      {/* Filter / search bar */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full">
           <div className="relative w-full sm:w-80">
-            <Search
-              size={18}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-            />
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by name, ID, phone..."
+              placeholder="Search by name, ID, phone…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
           </div>
 
-          {/* Status Dropdown */}
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-sm font-medium text-slate-600 whitespace-nowrap">
-              Status:
-            </span>
+            <span className="text-sm font-medium text-slate-600 whitespace-nowrap">Status:</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="flex-1 sm:flex-none px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
             >
               <option value="All Patients">All Patients</option>
-              <option value="Active">Active</option>
-              <option value="Discharged">Discharged</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
             </select>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-          <button className="flex items-center gap-2 px-3.5 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end shrink-0">
+          <button className="flex items-center gap-2 px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
             <SlidersHorizontal size={16} />
-            <span>Filters</span>
+            <span className="hidden sm:inline">Filters</span>
           </button>
-          <button className="flex items-center gap-2 px-3.5 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+          <button className="flex items-center gap-2 px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
             <Download size={16} />
-            <span>Export</span>
+            <span className="hidden sm:inline">Export</span>
           </button>
         </div>
       </div>
 
-      {/* Main Table Container */}
+      {/* Table */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -316,8 +414,12 @@ export default function Patients() {
             <tbody className="divide-y divide-slate-100 text-sm">
               {filteredPatients.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-slate-500">
-                    No patients matching the criteria.
+                  <td colSpan="6" className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <Users size={28} strokeWidth={1.5} />
+                      <p className="text-slate-500 font-medium">No patients match your search</p>
+                      <p className="text-xs text-slate-400">Try adjusting the search term or status filter.</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -326,91 +428,74 @@ export default function Patients() {
                     patient.name ||
                     `${patient.first_name || ""} ${patient.last_name || ""}`.trim() ||
                     "Unnamed";
-                  const code = patient.patient_code || `PT-2026-08${patient.id}`;
-                  const age =
-                    patient.age ||
-                    calculateAge(patient.date_of_birth) ||
-                    "32";
-                  const gender = patient.gender || "Female";
-                  const initials = getInitials(
-                    patient.first_name,
-                    patient.last_name,
-                    fullName
-                  );
-                  const status = patient.status || "Active";
+                  const code = patient.patient_code || `PT-${String(patient.id).padStart(4, "0")}`;
+                  const age = calculateAge(patient.date_of_birth);
+                  const gender = patient.gender || "—";
+                  const initials = getInitials(patient.first_name, patient.last_name, fullName);
+                  const status = patient.status || "active";
                   const isActive = status.toLowerCase() === "active";
+                  const avatarColor = getAvatarColor(patient.id ?? fullName);
 
                   return (
-                    <tr
-                      key={patient.id}
-                      className="hover:bg-slate-50/70 transition-colors"
-                    >
-                      {/* Name & ID Column */}
+                    <tr key={patient.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3.5">
-                          <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-xs shrink-0">
+                          <div
+                            className={`w-10 h-10 rounded-full ${avatarColor.bg} ${avatarColor.text} font-bold flex items-center justify-center text-xs shrink-0`}
+                          >
                             {initials}
                           </div>
                           <div>
-                            <div className="font-bold text-slate-900 text-base">
+                            <div className="font-bold text-slate-900 text-base leading-tight">
                               {fullName}
                             </div>
-                            <div className="text-xs text-slate-400 font-medium mt-0.5">
-                              {code}
-                            </div>
+                            <div className="text-xs text-slate-400 font-medium mt-0.5">{code}</div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Gender / Age Column */}
                       <td className="py-4 px-6">
-                        <div className="capitalize text-slate-800 font-medium">
-                          {gender}
-                        </div>
+                        <div className="capitalize text-slate-800 font-medium">{gender}</div>
                         <div className="text-xs text-slate-400 mt-0.5">
-                          {age} yrs
+                          {age !== null ? `${age} yrs` : "Age unknown"}
                         </div>
                       </td>
 
-                      {/* Phone */}
                       <td className="py-4 px-6 text-slate-600 font-medium">
-                        {patient.phone || "+1 (555) 000-0000"}
+                        {patient.phone || <span className="text-slate-300">—</span>}
                       </td>
 
-                      {/* Email */}
                       <td className="py-4 px-6 text-slate-600 font-medium">
-                        {patient.email || "patient@example.com"}
+                        {patient.email || <span className="text-slate-300">—</span>}
                       </td>
 
-                      {/* Status Badge */}
                       <td className="py-4 px-6">
                         <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                            isActive
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-slate-200 text-slate-600"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold capitalize ${
+                            isActive ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-600"
                           }`}
                         >
+                          <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-blue-600" : "bg-slate-400"}`} />
                           {status}
                         </span>
                       </td>
 
-                      {/* Actions Menu */}
                       <td className="py-4 px-6 text-right relative">
                         <button
                           onClick={() =>
-                            setActiveMenuId(
-                              activeMenuId === patient.id ? null : patient.id
-                            )
+                            setActiveMenuId(activeMenuId === patient.id ? null : patient.id)
                           }
                           className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                          aria-label="Row actions"
                         >
                           <MoreVertical size={18} />
                         </button>
 
-                        {/* Action Popover Menu */}
                         {activeMenuId === patient.id && (
-                          <div className="absolute right-6 top-12 w-32 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20 text-left">
+                          <div
+                            ref={menuRef}
+                            className="absolute right-6 top-12 w-36 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20 text-left"
+                          >
                             {canUpdate && (
                               <button
                                 onClick={() => handleOpenEditModal(patient)}
@@ -445,18 +530,12 @@ export default function Patients() {
           </table>
         </div>
 
-        {/* Table Pagination Footer */}
+        {/* Pagination */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-slate-200 bg-white">
           <div className="text-sm font-medium text-slate-500">
-            Showing <span className="font-bold text-slate-800">1</span> to{" "}
-            <span className="font-bold text-slate-800">
-              {filteredPatients.length}
-            </span>{" "}
-            of{" "}
-            <span className="font-bold text-slate-800">
-              {filteredPatients.length}
-            </span>{" "}
-            entries
+            Showing <span className="font-bold text-slate-800">{filteredPatients.length ? 1 : 0}</span> to{" "}
+            <span className="font-bold text-slate-800">{filteredPatients.length}</span> of{" "}
+            <span className="font-bold text-slate-800">{filteredPatients.length}</span> entries
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -469,17 +548,10 @@ export default function Patients() {
             <button className="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
               1
             </button>
-            <button className="w-8 h-8 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold text-xs flex items-center justify-center">
-              2
-            </button>
-            <button className="w-8 h-8 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold text-xs flex items-center justify-center">
-              3
-            </button>
-            <span className="px-1 text-slate-400 text-xs">...</span>
-            <button className="w-8 h-8 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold text-xs flex items-center justify-center">
-              5
-            </button>
-            <button className="p-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">
+            <button
+              disabled
+              className="p-2 border border-slate-200 rounded-lg text-slate-300 disabled:opacity-50 cursor-not-allowed"
+            >
               <ChevronRight size={16} />
             </button>
           </div>
@@ -488,155 +560,233 @@ export default function Patients() {
 
       {/* Form Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 overflow-y-auto max-h-[90vh]">
-            <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900">
-                {editingPatientId ? "Edit Patient Details" : "Add New Patient"}
-              </h3>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-xl w-full flex flex-col max-h-[90vh]">
+            {/* Modal header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  {editingPatientId ? "Edit Patient Details" : "Add New Patient"}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {editingPatientId
+                    ? "Update this patient's information."
+                    : "Enter the patient's information to create a new record."}
+                </p>
+              </div>
               <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                onClick={handleCloseModal}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors shrink-0"
+                aria-label="Close"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    First Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="first_name"
-                    required
-                    value={formData.first_name}
-                    onChange={handleChange}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                  />
+            <form onSubmit={handleSubmit} className="overflow-y-auto px-6 py-5 space-y-6">
+              {formErrors && (
+                <div className="px-3.5 py-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700 whitespace-pre-line">
+                  {formErrors}
+                </div>
+              )}
+
+              {/* Personal information */}
+              <div className="space-y-3.5">
+                <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Personal Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">First Name *</label>
+                    <input
+                      type="text"
+                      name="first_name"
+                      required
+                      value={formData.first_name}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-shadow"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Last Name *</label>
+                    <input
+                      type="text"
+                      name="last_name"
+                      required
+                      value={formData.last_name}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-shadow"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Gender *</label>
+                    <select
+                      name="gender"
+                      required
+                      value={formData.gender}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none capitalize cursor-pointer"
+                    >
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Date of Birth</label>
+                    <input
+                      type="date"
+                      name="date_of_birth"
+                      value={formData.date_of_birth}
+                      onChange={handleChange}
+                      max={toISODateString(new Date())}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-shadow"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Blood Group</label>
+                    <select
+                      name="blood_group"
+                      value={formData.blood_group}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer"
+                    >
+                      <option value="">—</option>
+                      {BLOOD_GROUPS.map((bg) => (
+                        <option key={bg} value={bg}>
+                          {bg}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact information */}
+              <div className="space-y-3.5">
+                <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Contact Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-shadow"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-shadow"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    name="last_name"
-                    value={formData.last_name}
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Address</label>
+                  <textarea
+                    name="address"
+                    rows="2"
+                    value={formData.address}
                     onChange={handleChange}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-shadow resize-none"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Phone Number *
-                  </label>
-                  <input
-                    type="text"
-                    name="phone"
-                    required
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Gender
-                  </label>
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleChange}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none capitalize"
-                  >
-                    <option value="female">Female</option>
-                    <option value="male">Male</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Date of Birth
-                  </label>
-                  <input
-                    type="date"
-                    name="date_of_birth"
-                    value={formData.date_of_birth}
-                    onChange={handleChange}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Status
-                  </label>
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Discharged">Discharged</option>
-                  </select>
+              {/* Emergency contact */}
+              <div className="space-y-3.5">
+                <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Emergency Contact
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Contact Name</label>
+                    <input
+                      type="text"
+                      name="emergency_contact"
+                      value={formData.emergency_contact}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-shadow"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Contact Phone</label>
+                    <input
+                      type="tel"
+                      name="emergency_phone"
+                      value={formData.emergency_phone}
+                      onChange={handleChange}
+                      className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-shadow"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Address
-                </label>
-                <textarea
-                  name="address"
-                  rows="2"
-                  value={formData.address}
-                  onChange={handleChange}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                ></textarea>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6 border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm disabled:opacity-50"
-                >
-                  {submitting
-                    ? "Saving..."
-                    : editingPatientId
-                    ? "Update Patient"
-                    : "Save Patient"}
-                </button>
+              {/* Record status */}
+              <div className="space-y-3.5">
+                <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Record Status</h4>
+                <div className="flex gap-3">
+                  {STATUS_OPTIONS.map((opt) => (
+                    <label
+                      key={opt}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-semibold capitalize cursor-pointer transition-colors ${
+                        formData.status === opt
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="status"
+                        value={opt}
+                        checked={formData.status === opt}
+                        onChange={handleChange}
+                        className="sr-only"
+                      />
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          formData.status === opt ? "bg-blue-600" : "bg-slate-300"
+                        }`}
+                      />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
               </div>
             </form>
+
+            {/* Footer actions */}
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm disabled:opacity-50 transition-colors inline-flex items-center gap-2"
+              >
+                {submitting && (
+                  <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                )}
+                {submitting ? "Saving…" : editingPatientId ? "Update Patient" : "Save Patient"}
+              </button>
+            </div>
           </div>
         </div>
       )}

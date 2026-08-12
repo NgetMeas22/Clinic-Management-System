@@ -70,7 +70,7 @@ class DoctorController extends Controller
                 'gender' => 'required|in:male,female,other',
                 'date_of_birth' => 'nullable|date',
                 'address' => 'nullable|string',
-                'status' => 'nullable|in:active,inactive',
+                'status' => 'required|in:active,inactive',
             ]);
 
             $doctor = DB::transaction(function () use ($validated) {

@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Exception;
 
 class DepartmentController extends Controller
@@ -15,7 +18,6 @@ class DepartmentController extends Controller
     public function index()
     {
         try {
-
             $departments = Department::latest()->paginate(10);
 
             return response()->json([
@@ -25,7 +27,6 @@ class DepartmentController extends Controller
             ], 200);
 
         } catch (Exception $e) {
-
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve departments',
@@ -34,14 +35,12 @@ class DepartmentController extends Controller
         }
     }
 
-
     /**
      * POST /api/departments
      */
     public function store(Request $request)
     {
         try {
-
             $validated = $request->validate([
                 'name' => 'required|string|max:100|unique:departments,name',
                 'description' => 'nullable|string',
@@ -56,8 +55,14 @@ class DepartmentController extends Controller
                 'data' => $department
             ], 201);
 
-        } catch (Exception $e) {
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
 
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create department',
@@ -66,14 +71,12 @@ class DepartmentController extends Controller
         }
     }
 
-
     /**
      * GET /api/departments/{id}
      */
     public function show($id)
     {
         try {
-
             $department = Department::findOrFail($id);
 
             return response()->json([
@@ -82,16 +85,20 @@ class DepartmentController extends Controller
                 'data' => $department
             ], 200);
 
-        } catch (Exception $e) {
-
+        } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Department not found',
-                'error' => $e->getMessage()
+                'message' => 'Department not found'
             ], 404);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve department',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
-
 
     /**
      * PUT /api/departments/{id}
@@ -99,11 +106,15 @@ class DepartmentController extends Controller
     public function update(Request $request, $id)
     {
         try {
-
             $department = Department::findOrFail($id);
 
             $validated = $request->validate([
-                'name' => 'required|string|max:100|unique:departments,name,' . $id,
+                'name' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    Rule::unique('departments', 'name')->ignore($department->id),
+                ],
                 'description' => 'nullable|string',
                 'status' => 'nullable|in:active,inactive',
             ]);
@@ -116,8 +127,20 @@ class DepartmentController extends Controller
                 'data' => $department
             ], 200);
 
-        } catch (Exception $e) {
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Department not found'
+            ], 404);
 
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update department',
@@ -126,16 +149,13 @@ class DepartmentController extends Controller
         }
     }
 
-
     /**
      * DELETE /api/departments/{id}
      */
     public function destroy($id)
     {
         try {
-
             $department = Department::findOrFail($id);
-
             $department->delete();
 
             return response()->json([
@@ -143,8 +163,13 @@ class DepartmentController extends Controller
                 'message' => 'Department deleted successfully'
             ], 200);
 
-        } catch (Exception $e) {
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Department not found'
+            ], 404);
 
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete department',

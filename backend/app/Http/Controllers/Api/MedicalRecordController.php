@@ -158,7 +158,7 @@ class MedicalRecordController extends Controller
         $validator = Validator::make($request->all(), [
             'patient_id' => 'required|exists:patients,id',
             'doctor_id' => 'required|exists:doctors,id',
-            'appointment_id' => 'required|exists:appointments,id',
+            'appointment_id' => 'nullable|exists:appointments,id',
             'symptoms' => 'required|string',
             'diagnosis' => 'required|string',
             'treatment' => 'nullable|string',
