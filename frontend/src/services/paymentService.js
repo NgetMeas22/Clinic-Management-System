@@ -1,22 +1,29 @@
 import api from './api';
 
-// Helper function សម្រាប់សម្អាត និងបំប្លែងទិន្នន័យឱ្យត្រូវ Data Type
+// Helper function to clean & normalize the payload into the exact field
+// names the backend validates (payment_date / payment_method / payment_status).
 const formatPaymentPayload = (data) => {
-    // 1. បំប្លែង Amount: លុបសញ្ញា $ ឬអក្សរចេញ ទុកតែលេខ ហើយបំប្លែងទៅជា Float
+    // 1. Amount: strip any $ / currency symbols, then cast to Float
     const cleanAmount = typeof data.amount === 'string'
         ? parseFloat(data.amount.replace(/[^0-9.-]+/g, ''))
         : Number(data.amount);
 
-    // 2. បំប្លែង Appointment ID: បំប្លែងទៅជា Number ឬ null (បើគ្មាន ឬជា string ទទេ)
-    const appointmentId = data.appointment_id || data.appointmentId;
+    // 2. Appointment ID: cast to Number or null when empty
+    const appointmentId = data.appointment_id ?? data.appointmentId;
     const cleanAppointmentId = appointmentId && !isNaN(appointmentId)
         ? Number(appointmentId)
         : null;
 
-    // 3. បំប្លែង Date: បំប្លែងទៅជា ISO String (YYYY-MM-DD)
-    let formattedDate = data.date;
-    if (data.date) {
-        const parsedDate = new Date(data.date);
+    // 3. Patient ID: cast to Number or null when empty
+    const patientId = data.patient_id ?? data.patientId;
+    const cleanPatientId = patientId && !isNaN(patientId)
+        ? Number(patientId)
+        : null;
+
+    // 4. Date: keep as YYYY-MM-DD (accept both payment_date and date keys)
+    let formattedDate = data.payment_date ?? data.date;
+    if (formattedDate) {
+        const parsedDate = new Date(formattedDate);
         if (!isNaN(parsedDate.getTime())) {
             formattedDate = parsedDate.toISOString().split('T')[0];
         }
@@ -24,11 +31,12 @@ const formatPaymentPayload = (data) => {
 
     return {
         ...data,
+        patient_id: cleanPatientId,
         appointment_id: cleanAppointmentId,
         amount: isNaN(cleanAmount) ? 0 : cleanAmount,
-        date: formattedDate,
-        method: data.method?.toLowerCase() || 'cash',
-        status: data.status?.toLowerCase() || 'pending',
+        payment_date: formattedDate,
+        payment_method: (data.payment_method ?? data.method ?? 'cash').toLowerCase(),
+        payment_status: (data.payment_status ?? data.status ?? 'pending').toLowerCase(),
     };
 };
 

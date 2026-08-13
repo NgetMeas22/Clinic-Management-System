@@ -14,13 +14,24 @@ import {
 
 export default function AppointmentsManager({
   appointments = [],
+  search,
+  setSearch,
+  status,
+  setStatus,
   onAdd,
   onEdit,
   onDelete,
 }) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("All Statuses");
+  const [searchTerm, setSearchTerm] = useState(search || "");
+  const [selectedStatus, setSelectedStatus] = useState(status || "All Statuses");
   const [activeMenuId, setActiveMenuId] = useState(null);
+
+  // When the parent controls search/status, mirror its values so server-side
+  // filtering in Appointments.jsx stays in sync with the local inputs.
+  const query = setSearch ? search : searchTerm;
+  const statusFilter = setStatus ? status || "All Statuses" : selectedStatus;
+  const updateSearch = (value) => (setSearch ? setSearch(value) : setSearchTerm(value));
+  const updateStatus = (value) => (setStatus ? setStatus(value) : setSelectedStatus(value));
 
   // Status style helper
   const getStatusBadge = (status) => {
@@ -55,20 +66,20 @@ export default function AppointmentsManager({
       const doctorName = (item.doctor?.user?.name || item.doctor?.name || "").toLowerCase();
       const reason = (item.reason || "").toLowerCase();
       const status = (item.status || "").toLowerCase();
-      const query = searchTerm.toLowerCase();
+      const q = String(query || "").toLowerCase();
 
       const matchesSearch =
-        patientName.includes(query) ||
-        doctorName.includes(query) ||
-        reason.includes(query);
+        patientName.includes(q) ||
+        doctorName.includes(q) ||
+        reason.includes(q);
 
       const matchesStatus =
-        selectedStatus === "All Statuses" ||
-        status === selectedStatus.toLowerCase();
+        !statusFilter || statusFilter === "All Statuses" ||
+        status === String(statusFilter).toLowerCase();
 
       return matchesSearch && matchesStatus;
     });
-  }, [appointments, searchTerm, selectedStatus]);
+  }, [appointments, query, statusFilter]);
 
   return (
     <div className="p-6 md:p-8 bg-slate-50 min-h-screen space-y-6">
@@ -103,8 +114,8 @@ export default function AppointmentsManager({
             <input
               type="text"
               placeholder="Search patient, doctor, or reason..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={query}
+              onChange={(e) => updateSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
           </div>
@@ -112,8 +123,8 @@ export default function AppointmentsManager({
           {/* Status Select Filter */}
           <div className="w-full sm:w-auto">
             <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
+              value={statusFilter}
+              onChange={(e) => updateStatus(e.target.value)}
               className="w-full sm:w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="All Statuses">All Statuses</option>
@@ -127,7 +138,15 @@ export default function AppointmentsManager({
 
         {/* Action Button */}
         <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          <button className="p-2.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
+          <button
+            type="button"
+            title="Reset filters"
+            onClick={() => {
+              updateSearch("");
+              updateStatus("All Statuses");
+            }}
+            className="p-2.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+          >
             <SlidersHorizontal size={18} />
           </button>
         </div>
@@ -308,6 +327,7 @@ export default function AppointmentsManager({
 
           <div className="flex items-center gap-1">
             <button
+              type="button"
               disabled
               className="p-2 border border-slate-200 rounded-lg text-slate-300 disabled:opacity-50 cursor-not-allowed"
             >
@@ -316,10 +336,14 @@ export default function AppointmentsManager({
             <button className="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
               1
             </button>
-            <button className="w-8 h-8 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold text-xs flex items-center justify-center">
+            <button className="w-8 h-8 rounded-lg text-slate-400 font-semibold text-xs flex items-center justify-center">
               2
             </button>
-            <button className="p-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">
+            <button
+              type="button"
+              disabled
+              className="p-2 border border-slate-200 rounded-lg text-slate-300 cursor-not-allowed"
+            >
               <ChevronRight size={16} />
             </button>
           </div>

@@ -97,7 +97,7 @@ const AppointmentForm = ({
             <option value="">Select doctor</option>
             {doctors.map((doctor) => (
               <option key={doctor.id} value={doctor.id}>
-                Dr. {doctor.name}
+                Dr. {doctor.user?.name || doctor.name}
               </option>
             ))}
           </select>

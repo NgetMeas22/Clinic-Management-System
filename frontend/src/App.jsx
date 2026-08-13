@@ -25,6 +25,8 @@ import Departments from "./pages/Department";
 
 import Medicines from "./pages/Medicine";
 import Payments from "./pages/Payment";
+import Inventory from "./pages/Inventory";
+import Billing from "./pages/Billing";
 import Reports from "./pages/Reports";
 import User from "./pages/User";
 import Profile from "./pages/Profile";
@@ -101,7 +103,7 @@ function App() {
                     <Route path="/doctors" element={<Doctor />} />
                     <Route path="/patients" element={<Patients />} />
                     <Route path="/medicines" element={<Medicines />} />
-                    <Route path="/inventory" element={<Medicines />} />
+                    <Route path="/inventory" element={<Inventory />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/support" element={<Support />} />
@@ -139,7 +141,7 @@ function App() {
                 <Route element={<DashboardShell />}>
                     <Route path="/departments" element={<Departments />} />
                     <Route path="/payments" element={<Payments />} />
-                    <Route path="/billing" element={<Payments />} />
+                    <Route path="/billing" element={<Billing />} />
                 </Route>
             </Route>
 

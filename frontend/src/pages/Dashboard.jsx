@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import dashboardService from "../services/dashboardService";
 import medicineService from "../services/medicineService";
+import { getAppointments } from "../services/appointmentService";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../utils/permissions";
 
@@ -156,6 +157,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [medicines, setMedicines] = useState([]);
+  const [recentAppointments, setRecentAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -170,17 +172,21 @@ export default function Dashboard() {
     async function loadDashboard() {
       try {
         setLoading(true);
-        const [dashboardRes, yearlyRes, weeklyRes, medicineRes] = await Promise.all([
+        const [dashboardRes, yearlyRes, weeklyRes, medicineRes, apptRes] = await Promise.all([
           dashboardService.getDashboard(),
           dashboardService.getMonthly(),
           dashboardService.getWeekly(),
           medicineService.getAll(),
+          getAppointments(),
         ]);
 
         if (!mounted) return;
 
         setStats(dashboardRes.data || {});
         setMedicines(medicineRes.data || []);
+
+        const apptArray = apptRes?.data?.data?.data || apptRes?.data?.data || [];
+        setRecentAppointments(Array.isArray(apptArray) ? apptArray : []);
         setRangeCache((prev) => ({
           ...prev,
           week: weeklyRes.data || {},
@@ -292,7 +298,6 @@ export default function Dashboard() {
   }, [rangeCache, range]);
 
   const lowStock = medicines.filter((item) => Number(item.quantity) <= 10).slice(0, 5);
-  const recentAppointments = stats?.recent_appointments ?? [];
 
   const cards = [
     {
@@ -555,18 +560,22 @@ export default function Dashboard() {
                 <tbody className="divide-y divide-slate-100">
                   {recentAppointments.slice(0, 5).map((appt) => {
                     const status = (appt.status || "").toLowerCase();
+                    const patientName =
+                      `${appt.patient?.first_name || ""} ${appt.patient?.last_name || ""}`.trim() || "Unknown";
+                    const doctorName = appt.doctor?.user?.name || appt.doctor_name || "—";
+                    const apptTime = appt.appointment_time || appt.time || "—";
                     return (
                       <tr key={appt.id} className="text-slate-700 transition-colors hover:bg-slate-50">
                         <td className="py-3 pr-4">
                           <div className="flex items-center gap-3">
                             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
-                              {initialsOf(appt.patient_name)}
+                              {initialsOf(patientName)}
                             </span>
-                            <span className="font-medium text-slate-900">{appt.patient_name}</span>
+                            <span className="font-medium text-slate-900">{patientName}</span>
                           </div>
                         </td>
-                        <td className="py-3 pr-4 text-slate-500">{appt.doctor_name}</td>
-                        <td className="py-3 pr-4 text-slate-500">{appt.time}</td>
+                        <td className="py-3 pr-4 text-slate-500">{doctorName}</td>
+                        <td className="py-3 pr-4 text-slate-500">{apptTime}</td>
                         <td className="py-3 pr-4">
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${

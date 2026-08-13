@@ -386,11 +386,52 @@ export default function Patients() {
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto justify-end shrink-0">
-          <button className="flex items-center gap-2 px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+          <button
+            type="button"
+            title="Reset filters"
+            onClick={() => {
+              setSearchTerm("");
+              setStatusFilter("All Patients");
+            }}
+            className="flex items-center gap-2 px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
             <SlidersHorizontal size={16} />
             <span className="hidden sm:inline">Filters</span>
           </button>
-          <button className="flex items-center gap-2 px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+          <button
+            type="button"
+            title="Export CSV"
+            onClick={() => {
+              if (filteredPatients.length === 0) return;
+              const headers = ["ID", "Name", "Gender", "Age", "Phone", "Email", "Status"];
+              const csv = [
+                headers.join(","),
+                ...filteredPatients.map((p) =>
+                  [
+                    p.patient_code || p.id,
+                    `${p.first_name || ""} ${p.last_name || ""}`.trim(),
+                    p.gender || "",
+                    calculateAge(p.date_of_birth) ?? "",
+                    p.phone || "",
+                    p.email || "",
+                    p.status || "active",
+                  ]
+                    .map((c) => `"${String(c).replace(/"/g, '""')}"`)
+                    .join(",")
+                ),
+              ].join("\n");
+              const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = "patients.csv";
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+            }}
+            className="flex items-center gap-2 px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
             <Download size={16} />
             <span className="hidden sm:inline">Export</span>
           </button>

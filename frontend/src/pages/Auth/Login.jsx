@@ -123,12 +123,13 @@ export default function Login() {
                 <label className="block text-xs font-semibold text-slate-700">
                   Password
                 </label>
-                <Link
-                  to="/forgot-password"
+                <button
+                  type="button"
+                  onClick={() => setError("Password reset is not available yet. Contact an administrator.")}
                   className="text-xs font-medium text-blue-600 hover:text-blue-700"
                 >
                   Forgot Password?
-                </Link>
+                </button>
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">

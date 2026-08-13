@@ -24,6 +24,7 @@ import {
   updateDoctor,
   deleteDoctor,
 } from "../services/doctorService";
+import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../utils/permissions";
 
@@ -42,22 +43,43 @@ export default function Doctors() {
   const [submitting, setSubmitting] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState(null);
 
-  // Department List mapping with IDs
-  const departmentList = [
-    { id: 1, name: "Cardiology" },
-    { id: 2, name: "Neurology" },
-    { id: 3, name: "Pediatrics" },
-    { id: 4, name: "Orthopedics" },
-    { id: 5, name: "General Medicine" },
-  ];
+  // Departments loaded from the API so department_id always matches the DB.
+  const [departmentList, setDepartmentList] = useState([]);
+  const [departmentsLoaded, setDepartmentsLoaded] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadDepartments = async () => {
+      try {
+        const response = await api.get("/departments");
+        const items = response.data?.data?.data || response.data?.data || response.data || [];
+        const depts = Array.isArray(items) ? items : [];
+        if (isMounted) {
+          setDepartmentList(
+            depts.map((d) => ({ id: d.id, name: d.name }))
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load departments:", error);
+      } finally {
+        if (isMounted) setDepartmentsLoaded(true);
+      }
+    };
+    loadDepartments();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const firstDepartment = departmentList[0] || { id: "", name: "" };
 
   const initialFormState = {
     name: "",
     doctor_code: "",
     phone: "",
     email: "",
-    department: departmentList[0].name,
-    department_id: departmentList[0].id,
+    department: firstDepartment.name,
+    department_id: firstDepartment.id,
     specialization: "General Practitioner",
     license_number: "",
     gender: "male",
@@ -177,7 +199,7 @@ export default function Doctors() {
       phone: doctor.user?.phone || doctor.phone || "",
       email: doctor.user?.email || doctor.email || "",
       department: deptName,
-      department_id: doctor.department_id || doctor.department?.id || (matchedDept ? matchedDept.id : 1),
+      department_id: doctor.department_id || doctor.department?.id || (matchedDept ? matchedDept.id : ""),
       specialization: doctor.specialization || doctor.speciality || "General Practitioner",
       license_number: doctor.license_number || "",
       gender: doctor.gender || "male",
@@ -195,10 +217,15 @@ export default function Doctors() {
     e.preventDefault();
     setSubmitting(true);
 
+    if (!formData.department_id) {
+      alert("Please select a department.");
+      return;
+    }
+
     // Make sure department_id is sent as a Number to the Laravel API
     const payload = {
       ...formData,
-      department_id: Number(formData.department_id) || 1,
+      department_id: Number(formData.department_id),
     };
 
     try {
@@ -334,16 +361,59 @@ export default function Doctors() {
                   {dept.name}
                 </option>
               ))}
+              {departmentList.length === 0 && (
+                <option value="All Departments">
+                  {departmentsLoaded ? "No departments" : "Loading departments..."}
+                </option>
+              )}
             </select>
           </div>
         </div>
 
         {/* Filters and Export Actions */}
         <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          <button className="p-2.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
+          <button
+            type="button"
+            title="Reset filters"
+            onClick={() => {
+              setSearchTerm("");
+              setSelectedDepartment("All Departments");
+            }}
+            className="p-2.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+          >
             <SlidersHorizontal size={18} />
           </button>
-          <button className="p-2.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
+          <button
+            type="button"
+            title="Export CSV"
+            onClick={() => {
+              if (filteredDoctors.length === 0) return;
+              const headers = ["Name", "Specialization", "Department", "Status"];
+              const csv = [
+                headers.join(","),
+                ...filteredDoctors.map((doc) =>
+                  [
+                    doc.user?.name || doc.name || "",
+                    doc.specialization || doc.speciality || "",
+                    getDepartmentName(doc),
+                    doc.status || "active",
+                  ]
+                    .map((c) => `"${String(c).replace(/"/g, '""')}"`)
+                    .join(",")
+                ),
+              ].join("\n");
+              const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = "doctors.csv";
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+            }}
+            className="p-2.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+          >
             <Download size={18} />
           </button>
         </div>
@@ -705,11 +775,17 @@ export default function Doctors() {
                             onChange={handleChange}
                             className="w-full appearance-none border border-slate-300 rounded-lg p-2.5 pr-9 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white"
                           >
-                            {departmentList.map((dept) => (
-                              <option key={dept.id} value={dept.id}>
-                                {dept.name}
+                            {departmentList.length === 0 ? (
+                              <option value="">
+                                {departmentsLoaded ? "No departments" : "Loading departments..."}
                               </option>
-                            ))}
+                            ) : (
+                              departmentList.map((dept) => (
+                                <option key={dept.id} value={dept.id}>
+                                  {dept.name}
+                                </option>
+                              ))
+                            )}
                           </select>
                           <ChevronDown
                             size={16}
