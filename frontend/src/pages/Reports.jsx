@@ -1,198 +1,186 @@
-import { useEffect, useState } from "react";
-import reportService from "../services/reportService";
+import { useState } from "react";
+import {
+  FileText,
+  Stethoscope,
+  Users,
+  CalendarDays,
+  Wallet,
+  Package,
+  ChevronDown,
+  Download,
+  Inbox,
+} from "lucide-react";
 
 export default function Reports() {
-    const [type, setType] = useState("patients");
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(false);
+  const reportTypes = [
+    { id: "doctor", label: "Doctor Report", icon: Stethoscope, columns: ["ID", "Name", "Specialization", "Phone"] },
+    { id: "patient", label: "Patient Report", icon: Users, columns: ["ID", "Name", "Age", "Last Visit"] },
+    { id: "appointment", label: "Appointment Report", icon: CalendarDays, columns: ["ID", "Patient", "Doctor", "Date"] },
+    { id: "revenue", label: "Revenue Report", icon: Wallet, columns: ["ID", "Invoice", "Amount", "Date"] },
+    { id: "inventory", label: "Inventory Report", icon: Package, columns: ["ID", "Item", "Stock", "Reorder Level"] },
+  ];
 
-    useEffect(() => {
-        const loadReport = async () => {
-            try {
-                setLoading(true);
-                let response;
+  const [activeId, setActiveId] = useState("doctor");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const active = reportTypes.find((r) => r.id === activeId);
+  const ActiveIcon = active.icon;
 
-                switch (type) {
-                    case "patients":
-                        response = await reportService.getPatients();
-                        break;
-                    case "doctors":
-                        response = await reportService.getDoctors();
-                        break;
-                    case "appointments":
-                        response = await reportService.getAppointments();
-                        break;
-                    case "payments":
-                        response = await reportService.getPayments();
-                        break;
-                    case "medicines":
-                        response = await reportService.getMedicines();
-                        break;
-                    default:
-                        response = { data: [] };
-                }
+  // Replace with real fetched rows per report type.
+  const rows = [];
 
-                setData(response.data?.data || []);
-            } catch (error) {
-                console.error("Failed to load report", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadReport();
-    }, [type]);
-
-    const renderTableHeader = () => {
-        switch (type) {
-            case "patients":
-                return (
-                    <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gender</th>
-                    </tr>
-                );
-            case "doctors":
-                return (
-                    <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Specialization</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                    </tr>
-                );
-            case "appointments":
-                return (
-                    <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Doctor</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    </tr>
-                );
-            case "payments":
-                return (
-                    <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    </tr>
-                );
-            case "medicines":
-                return (
-                    <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                    </tr>
-                );
-            default:
-                return null;
-        }
-    };
-
-    const renderTableRow = (item, index) => {
-        const itemKey = item.id || index;
-
-        switch (type) {
-            case "patients":
-                return (
-                    <tr key={itemKey} className="border-t">
-                        <td className="px-6 py-4 text-sm">{item.id}</td>
-                        <td className="px-6 py-4 text-sm font-medium">{`${item.first_name || ""} ${item.last_name || ""}`.trim()}</td>
-                        <td className="px-6 py-4 text-sm">{item.phone}</td>
-                        <td className="px-6 py-4 text-sm">{item.gender}</td>
-                    </tr>
-                );
-            case "doctors":
-                return (
-                    <tr key={itemKey} className="border-t">
-                        <td className="px-6 py-4 text-sm">{item.id}</td>
-                        <td className="px-6 py-4 text-sm font-medium">{item.user?.name || "-"}</td>
-                        <td className="px-6 py-4 text-sm">{item.specialization}</td>
-                        <td className="px-6 py-4 text-sm">{item.user?.phone || "-"}</td>
-                    </tr>
-                );
-            case "appointments":
-                return (
-                    <tr key={itemKey} className="border-t">
-                        <td className="px-6 py-4 text-sm">{item.id}</td>
-                        <td className="px-6 py-4 text-sm">{item.patient ? `${item.patient.first_name || ""} ${item.patient.last_name || ""}`.trim() : "-"}</td>
-                        <td className="px-6 py-4 text-sm">{item.doctor?.user?.name || "-"}</td>
-                        <td className="px-6 py-4 text-sm">{item.appointment_date}</td>
-                        <td className="px-6 py-4 text-sm">{item.status}</td>
-                    </tr>
-                );
-            case "payments":
-                return (
-                    <tr key={itemKey} className="border-t">
-                        <td className="px-6 py-4 text-sm">{item.id}</td>
-                        <td className="px-6 py-4 text-sm">{item.patient ? `${item.patient.first_name || ""} ${item.patient.last_name || ""}`.trim() : "-"}</td>
-                        <td className="px-6 py-4 text-sm">${item.amount}</td>
-                        <td className="px-6 py-4 text-sm">{item.payment_method}</td>
-                        <td className="px-6 py-4 text-sm">{item.payment_status}</td>
-                    </tr>
-                );
-            case "medicines":
-                return (
-                    <tr key={itemKey} className="border-t">
-                        <td className="px-6 py-4 text-sm">{item.id}</td>
-                        <td className="px-6 py-4 text-sm font-medium">{item.name}</td>
-                        <td className="px-6 py-4 text-sm">{item.quantity ?? item.stock}</td>
-                        <td className="px-6 py-4 text-sm">${item.price}</td>
-                    </tr>
-                );
-            default:
-                return null;
-        }
-    };
-
-    return (
-        <div className="p-6">
-            <h1 className="text-2xl font-bold mb-6">Reports</h1>
-
-            <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="border rounded-lg px-4 py-2 mb-6 bg-white outline-none focus:ring-2 focus:ring-blue-500"
-            >
-                <option value="patients">Patient Report</option>
-                <option value="doctors">Doctor Report</option>
-                <option value="appointments">Appointment Report</option>
-                <option value="payments">Payment Report</option>
-                <option value="medicines">Medicine Report</option>
-            </select>
-
-            {loading ? (
-                <div className="p-6 bg-white rounded-xl shadow-sm text-gray-500">
-                    Loading report...
-                </div>
-            ) : (
-                <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="bg-gray-50 border-b">
-                            {renderTableHeader()}
-                        </thead>
-                        <tbody>
-                            {data.length > 0 ? (
-                                data.map((item, index) => renderTableRow(item, index))
-                            ) : (
-                                <tr>
-                                    <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
-                                        No data available for this report.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl bg-blue-50 p-3 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+          <FileText size={24} strokeWidth={2} />
         </div>
-    );
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Reports
+          </h1>
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            Generate and review operational reports across the clinic.
+          </p>
+        </div>
+      </div>
+
+      {/* Report type chips */}
+      <div className="flex flex-wrap gap-2">
+        {reportTypes.map((r) => {
+          const Icon = r.icon;
+          const isActive = r.id === activeId;
+          return (
+            <button
+              key={r.id}
+              onClick={() => setActiveId(r.id)}
+              className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors ${
+                isActive
+                  ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              <Icon size={15} strokeWidth={2.25} />
+              {r.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {/* Custom select */}
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex w-56 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              <span className="flex items-center gap-2">
+                <ActiveIcon size={15} className="text-blue-600 dark:text-blue-400" />
+                {active.label}
+              </span>
+              <ChevronDown size={16} className={`text-slate-400 transition-transform ${menuOpen ? "rotate-180" : ""}`} />
+            </button>
+            {menuOpen && (
+              <div className="absolute z-10 mt-1.5 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                {reportTypes.map((r) => {
+                  const Icon = r.icon;
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => {
+                        setActiveId(r.id);
+                        setMenuOpen(false);
+                      }}
+                      className={`flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 ${
+                        r.id === activeId
+                          ? "font-semibold text-blue-600 dark:text-blue-400"
+                          : "text-slate-600 dark:text-slate-300"
+                      }`}
+                    >
+                      <Icon size={15} />
+                      {r.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Date range */}
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 shadow-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            />
+            <span className="text-sm text-slate-400">to</span>
+            <input
+              type="date"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 shadow-sm focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            />
+          </div>
+        </div>
+
+        <button
+          disabled={rows.length === 0}
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
+        >
+          <Download size={15} />
+          Export CSV
+        </button>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/40">
+                {active.columns.map((col) => (
+                  <th
+                    key={col}
+                    className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  >
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length > 0 ? (
+                rows.map((row, i) => (
+                  <tr key={i} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                    {active.columns.map((col) => (
+                      <td key={col} className="px-5 py-3 text-slate-600 dark:text-slate-300">
+                        {row[col]}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={active.columns.length} className="px-5 py-16">
+                    <div className="flex flex-col items-center justify-center gap-3 text-center">
+                      <div className="rounded-full bg-slate-100 p-3 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                        <Inbox size={22} />
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-600 dark:text-slate-300">
+                          No data for this report
+                        </p>
+                        <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
+                          Try a different date range, or check back once records exist.
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 }
