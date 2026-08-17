@@ -108,11 +108,12 @@ export default function Doctors() {
     "Oncologist",
   ];
 
-  // Must match the backend's `doctors.status` ENUM('active', 'inactive') exactly —
-  // sending "Active" or "On Leave" causes a MySQL truncation error (500).
+  // Must match the backend's `doctors.status` ENUM('active', 'inactive', 'on_leave')
+  // exactly — sending anything else causes a MySQL truncation error (500).
   const statusOptions = [
     { value: "active", label: "Active" },
     { value: "inactive", label: "Inactive" },
+    { value: "on_leave", label: "On Leave" },
   ];
 
   const BIO_MAX_LENGTH = 500;

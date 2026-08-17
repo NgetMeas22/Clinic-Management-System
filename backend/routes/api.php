@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\AppointmentController;
 
 // Public Routes
@@ -97,6 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Admin-ONLY Routes
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+    Route::apiResource('users', UserController::class);
     Route::get('/reports/patients', [ReportController::class, 'patients']);
     Route::get('/reports/doctors', [ReportController::class, 'doctors']);
     Route::get('/reports/appointments', [ReportController::class, 'appointments']);

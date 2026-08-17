@@ -64,7 +64,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateProfile = async (data) => {
-    const res = await axios.put('/profile', data);
+    const res = data instanceof FormData
+      ? await axios.post('/profile', (() => {
+        if (!data.has('_method')) {
+          data.append('_method', 'PUT');
+        }
+        return data;
+      })())
+      : await axios.put('/profile', data);
     setUser(res.data.user);
     return res.data;
   };

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -49,6 +50,8 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'phone' => $user->phone,
+                'avatar_url' => $user->avatar_url,
+                'profile_picture' => $user->profile_picture,
                 'role' => $user->role
                     ? $user->role->name
                     : null,
@@ -68,6 +71,8 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'phone' => $user->phone,
+                'avatar_url' => $user->avatar_url,
+                'profile_picture' => $user->profile_picture,
                 'role' => $user->role
                     ? $user->role->name
                     : null,
@@ -83,7 +88,16 @@ class AuthController extends Controller
             'name' => 'required|string|max:100',
             'email' => 'required|email|max:150|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|max:30',
+            'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
+
+        if ($request->hasFile('profile_picture')) {
+            if ($user->profile_picture) {
+                Storage::disk('public')->delete($user->profile_picture);
+            }
+
+            $validated['profile_picture'] = $request->file('profile_picture')->store('profile-pictures', 'public');
+        }
 
         $user->update($validated);
         $user->load('role');
@@ -95,6 +109,8 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'phone' => $user->phone,
+                'avatar_url' => $user->avatar_url,
+                'profile_picture' => $user->profile_picture,
                 'role' => $user->role ? $user->role->name : null,
             ],
         ], 200);

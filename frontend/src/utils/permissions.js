@@ -39,6 +39,11 @@ export const actions = {
     update: [ROLES.ADMIN, ROLES.DOCTOR, ROLES.RECEPTIONIST],
     delete: [ROLES.ADMIN],
   },
+  users: {
+    create: [ROLES.ADMIN],
+    update: [ROLES.ADMIN],
+    delete: [ROLES.ADMIN],
+  },
   departments: {
     create: [ROLES.ADMIN],
     update: [ROLES.ADMIN],

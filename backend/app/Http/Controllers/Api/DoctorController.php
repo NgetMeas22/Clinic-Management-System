@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Department;
 use App\Models\Doctor;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -70,22 +72,25 @@ class DoctorController extends Controller
                 'gender' => 'required|in:male,female,other',
                 'date_of_birth' => 'nullable|date',
                 'address' => 'nullable|string',
-                'status' => 'required|in:active,inactive',
+                'status' => 'required|in:active,inactive,on_leave',
             ]);
 
             $doctor = DB::transaction(function () use ($validated) {
+                $doctorRole = Role::where('name', 'Doctor')->firstOrFail();
 
-                // Create User
+                // users.status only supports active/inactive, while doctors.status
+                // also supports on_leave — keep the two independent.
+                $userStatus = $validated['status'] === 'inactive' ? 'inactive' : 'active';
+
                 $user = User::create([
-                    'role_id' => 2,
+                    'role_id' => $doctorRole->id,
                     'name' => $validated['name'],
                     'email' => $validated['email'],
                     'password' => Hash::make('doctor7777'),
                     'phone' => $validated['phone'] ?? null,
-                    'status' => $validated['status'] ?? 'active',
+                    'status' => $userStatus,
                 ]);
 
-                // Create Doctor
                 return Doctor::create([
                     'user_id' => $user->id,
                     'department_id' => $validated['department_id'],
@@ -167,18 +172,37 @@ class DoctorController extends Controller
                 'gender' => 'required|in:male,female,other',
                 'date_of_birth' => 'nullable|date',
                 'address' => 'nullable|string',
-                'status' => 'nullable|in:active,inactive',
+                'status' => 'nullable|in:active,inactive,on_leave',
             ]);
 
             DB::transaction(function () use ($doctor, $validated) {
 
-                // Update User
-                $doctor->user->update([
-                    'name' => $validated['name'],
-                    'email' => $validated['email'],
-                    'phone' => $validated['phone'] ?? null,
-                    'status' => $validated['status'] ?? 'active',
-                ]);
+                // users.status only supports active/inactive, while doctors.status
+                // also supports on_leave — keep the two independent.
+                $userStatus = $validated['status'] === 'inactive' ? 'inactive' : 'active';
+
+                if ($doctor->user) {
+                    // Update User
+                    $doctor->user->update([
+                        'name' => $validated['name'],
+                        'email' => $validated['email'],
+                        'phone' => $validated['phone'] ?? null,
+                        'status' => $userStatus,
+                    ]);
+                } else {
+                    // Re-attach an orphaned doctor (its user was deleted) so the
+                    // record becomes editable and keepable again.
+                    $role = Role::where('name', 'Doctor')->firstOrFail();
+                    $user = User::create([
+                        'role_id' => $role->id,
+                        'name' => $validated['name'],
+                        'email' => $validated['email'],
+                        'phone' => $validated['phone'] ?? null,
+                        'password' => Hash::make('doctor7777'),
+                        'status' => $userStatus,
+                    ]);
+                    $doctor->update(['user_id' => $user->id]);
+                }
 
                 // Update Doctor
                 $doctor->update([
@@ -220,14 +244,23 @@ class DoctorController extends Controller
 
             $doctor = Doctor::with('user')->findOrFail($id);
 
+            $hasDependencies = $doctor->appointments()->exists()
+                || $doctor->medicalRecords()->exists()
+                || $doctor->prescriptions()->exists();
+
+            if ($hasDependencies) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This doctor cannot be deleted because records already reference them. Mark the doctor inactive instead.',
+                ], 422);
+            }
+
             DB::transaction(function () use ($doctor) {
 
                 $user = $doctor->user;
 
-                // Delete Doctor
                 $doctor->delete();
 
-                // Delete User
                 if ($user) {
                     $user->delete();
                 }
@@ -248,4 +281,3 @@ class DoctorController extends Controller
         }
     }
 }
-

@@ -170,6 +170,114 @@ export default function Reports() {
     URL.revokeObjectURL(url);
   };
 
+  const exportPdf = () => {
+    // NOTE: do NOT use "noopener,noreferrer" here — with those features the
+    // returned WindowProxy is null and the print dialog never opens.
+    const printWindow = window.open("", "_blank", "width=1100,height=900");
+    if (!printWindow) {
+      window.alert(
+        "Could not open the print window. Please allow pop-ups for this site and try again."
+      );
+      return;
+    }
+
+    const title = `${active.label} - NGM Clinic`;
+    const escapeHtml = (value) =>
+      String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const rowsHtml = rows
+      .map(
+        (row) => `
+          <tr>
+            ${cells(row)
+              .map((cell) => `<td>${escapeHtml(cell)}</td>`)
+              .join("")}
+          </tr>`
+      )
+      .join("");
+
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              padding: 32px;
+              font-family: Arial, Helvetica, sans-serif;
+              color: #0f172a;
+              background: #fff;
+            }
+            h1 {
+              margin: 0 0 6px;
+              font-size: 24px;
+            }
+            p {
+              margin: 0 0 20px;
+              color: #475569;
+              font-size: 13px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 12px;
+            }
+            th, td {
+              border: 1px solid #dbe2ea;
+              padding: 10px;
+              text-align: left;
+              vertical-align: top;
+            }
+            th {
+              background: #eff6ff;
+              color: #1e3a8a;
+            }
+            tbody tr:nth-child(even) td {
+              background: #f8fafc;
+            }
+            .empty {
+              padding: 48px 0;
+              text-align: center;
+              color: #64748b;
+            }
+            @media print {
+              body { padding: 16px; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          <p>Generated on ${new Date().toLocaleString()}</p>
+          ${
+            rows.length
+              ? `
+                <table>
+                  <thead>
+                    <tr>${headers.map((header) => `<th>${header}</th>`).join("")}</tr>
+                  </thead>
+                  <tbody>${rowsHtml}</tbody>
+                </table>
+              `
+              : `<div class="empty">No data available for this report.</div>`
+          }
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 250);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -217,14 +325,24 @@ export default function Reports() {
           </span>
         </div>
 
-        <button
-          onClick={exportCsv}
-          disabled={rows.length === 0}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
-        >
-          <Download size={15} />
-          Export CSV
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            onClick={exportPdf}
+            disabled={rows.length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
+          >
+            <FileText size={15} />
+            Export PDF
+          </button>
+          <button
+            onClick={exportCsv}
+            disabled={rows.length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
+          >
+            <Download size={15} />
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {error && (

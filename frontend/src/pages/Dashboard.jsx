@@ -12,16 +12,24 @@ import {
   YAxis,
 } from "recharts";
 import {
+  AlertTriangle,
   Banknote,
   Calendar,
+  CalendarX2,
+  Check,
+  ChevronRight,
+  Clock,
+  Eye,
   Loader2,
   MoreVertical,
   Pill,
   Plus,
+  RefreshCcw,
   Stethoscope,
   TrendingDown,
   TrendingUp,
   Users,
+  X,
 } from "lucide-react";
 import dashboardService from "../services/dashboardService";
 import medicineService from "../services/medicineService";
@@ -45,6 +53,23 @@ const STATUS_STYLES = {
   completed: "bg-slate-100 text-slate-600 ring-slate-500/20",
 };
 
+// Deterministic avatar tint so the same name always gets the same color,
+// giving the table a bit of visual variety instead of one flat blue.
+const AVATAR_TINTS = [
+  "bg-blue-100 text-blue-700",
+  "bg-violet-100 text-violet-700",
+  "bg-teal-100 text-teal-700",
+  "bg-amber-100 text-amber-700",
+  "bg-rose-100 text-rose-700",
+  "bg-indigo-100 text-indigo-700",
+];
+
+function avatarTint(name = "") {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_TINTS[hash % AVATAR_TINTS.length];
+}
+
 function initialsOf(name = "") {
   return name
     .split(" ")
@@ -60,6 +85,11 @@ function compactNumber(value) {
 
 function daysInMonth(year, month) {
   return new Date(year, month, 0).getDate();
+}
+
+function formatUpdatedAt(date) {
+  if (!date) return "";
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
 }
 
 function TrendBadge({ value }) {
@@ -153,6 +183,21 @@ function StatCardSkeleton() {
   );
 }
 
+// Shared empty-state block: an icon, a short message, and optional action —
+// used wherever a list can legitimately be empty, so it reads as an
+// intentional state rather than a broken one.
+function EmptyState({ icon: Icon, title, description }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-6 py-10 text-center">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200">
+        <Icon size={18} />
+      </div>
+      <p className="text-sm font-semibold text-slate-700">{title}</p>
+      {description && <p className="max-w-xs text-xs text-slate-500">{description}</p>}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
@@ -160,51 +205,59 @@ export default function Dashboard() {
   const [recentAppointments, setRecentAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
 
   const [range, setRange] = useState("week");
   const [rangeCache, setRangeCache] = useState({});
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeError, setRangeError] = useState("");
 
+  const loadDashboard = useCallback(async ({ silent } = {}) => {
+    try {
+      if (silent) setRefreshing(true);
+      else setLoading(true);
+      setError("");
+
+      const [dashboardRes, yearlyRes, weeklyRes, medicineRes, apptRes] = await Promise.all([
+        dashboardService.getDashboard(),
+        dashboardService.getMonthly(),
+        dashboardService.getWeekly(),
+        medicineService.getAll(),
+        getAppointments(),
+      ]);
+
+      setStats(dashboardRes.data || {});
+      setMedicines(medicineRes.data || []);
+
+      const apptArray = apptRes?.data?.data?.data || apptRes?.data?.data || [];
+      setRecentAppointments(Array.isArray(apptArray) ? apptArray : []);
+      setRangeCache((prev) => ({
+        ...prev,
+        week: weeklyRes.data || {},
+        year: yearlyRes.data || {},
+      }));
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error("Failed to load dashboard", err);
+      setError("Dashboard data could not be loaded. Try refreshing the page.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
-
-    async function loadDashboard() {
-      try {
-        setLoading(true);
-        const [dashboardRes, yearlyRes, weeklyRes, medicineRes, apptRes] = await Promise.all([
-          dashboardService.getDashboard(),
-          dashboardService.getMonthly(),
-          dashboardService.getWeekly(),
-          medicineService.getAll(),
-          getAppointments(),
-        ]);
-
-        if (!mounted) return;
-
-        setStats(dashboardRes.data || {});
-        setMedicines(medicineRes.data || []);
-
-        const apptArray = apptRes?.data?.data?.data || apptRes?.data?.data || [];
-        setRecentAppointments(Array.isArray(apptArray) ? apptArray : []);
-        setRangeCache((prev) => ({
-          ...prev,
-          week: weeklyRes.data || {},
-          year: yearlyRes.data || {},
-        }));
-      } catch (err) {
-        console.error("Failed to load dashboard", err);
-        if (mounted) setError("Dashboard data could not be loaded.");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
-    loadDashboard();
-
+    (async () => {
+      if (!mounted) return;
+      await loadDashboard();
+    })();
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Lazily fetch week/month breakdowns the first time each tab is selected.
@@ -298,6 +351,7 @@ export default function Dashboard() {
   }, [rangeCache, range]);
 
   const lowStock = medicines.filter((item) => Number(item.quantity) <= 10).slice(0, 5);
+  const criticalStock = lowStock.filter((item) => Number(item.quantity) <= 3).length;
 
   const cards = [
     {
@@ -358,7 +412,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" onClick={() => openMenuId && setOpenMenuId(null)}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
@@ -367,19 +421,50 @@ export default function Dashboard() {
             summary for today.
           </p>
         </div>
-        {can(user, "appointments", "create") && (
-          <Link
-            to="/appointments"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 hover:shadow"
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => loadDashboard({ silent: true })}
+            disabled={refreshing}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            title={lastUpdated ? `Last updated ${formatUpdatedAt(lastUpdated)}` : "Refresh"}
           >
-            <Plus size={18} />
-            New appointment
-          </Link>
-        )}
+            <RefreshCcw size={16} className={refreshing ? "animate-spin" : ""} />
+            <span className="hidden sm:inline">{refreshing ? "Refreshing…" : "Refresh"}</span>
+          </button>
+          {can(user, "appointments", "create") && (
+            <Link
+              to="/appointments"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 hover:shadow"
+            >
+              <Plus size={18} />
+              New appointment
+            </Link>
+          )}
+        </div>
       </div>
 
+      {lastUpdated && (
+        <p className="-mt-4 flex items-center gap-1.5 text-xs text-slate-400">
+          <Clock size={12} />
+          Updated {formatUpdatedAt(lastUpdated)}
+        </p>
+      )}
+
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <span className="flex items-center gap-2">
+            <AlertTriangle size={16} />
+            {error}
+          </span>
+          <button
+            type="button"
+            onClick={() => loadDashboard()}
+            className="shrink-0 font-semibold underline decoration-red-300 underline-offset-2 hover:text-red-800"
+          >
+            Retry
+          </button>
+        </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -540,8 +625,11 @@ export default function Dashboard() {
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md xl:col-span-2">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-slate-900">Recent appointments</h2>
-            <Link to="/appointments" className="text-sm font-semibold text-blue-600 hover:text-blue-700">
-              View all &rarr;
+            <Link
+              to="/appointments"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700"
+            >
+              View all <ChevronRight size={14} />
             </Link>
           </div>
 
@@ -549,7 +637,7 @@ export default function Dashboard() {
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <tr className="border-b border-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-400">
                     <th className="pb-3 pr-4 font-semibold">Patient</th>
                     <th className="pb-3 pr-4 font-semibold">Doctor</th>
                     <th className="pb-3 pr-4 font-semibold">Time</th>
@@ -568,7 +656,11 @@ export default function Dashboard() {
                       <tr key={appt.id} className="text-slate-700 transition-colors hover:bg-slate-50">
                         <td className="py-3 pr-4">
                           <div className="flex items-center gap-3">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
+                            <span
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarTint(
+                                patientName
+                              )}`}
+                            >
                               {initialsOf(patientName)}
                             </span>
                             <span className="font-medium text-slate-900">{patientName}</span>
@@ -586,14 +678,43 @@ export default function Dashboard() {
                             {appt.status}
                           </span>
                         </td>
-                        <td className="py-3 text-right">
+                        <td className="relative py-3 text-right">
                           <button
                             type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(openMenuId === appt.id ? null : appt.id);
+                            }}
                             className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                             aria-label="More actions"
                           >
                             <MoreVertical size={16} />
                           </button>
+                          {openMenuId === appt.id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 top-9 z-10 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-left shadow-lg"
+                            >
+                              <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                              >
+                                <Eye size={14} /> View details
+                              </button>
+                              <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                              >
+                                <Check size={14} /> Mark completed
+                              </button>
+                              <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                              >
+                                <X size={14} /> Cancel
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -602,30 +723,60 @@ export default function Dashboard() {
               </table>
             </div>
           ) : (
-            <p className="mt-6 text-sm text-slate-500">No recent appointments to show.</p>
+            <div className="mt-4">
+              <EmptyState
+                icon={CalendarX2}
+                title="No recent appointments"
+                description="New bookings will show up here as soon as they're scheduled."
+              />
+            </div>
           )}
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900">Inventory alerts</h2>
-            <Pill size={18} className="text-blue-600" />
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Inventory alerts</h2>
+              {lowStock.length > 0 && (
+                <p className="text-xs text-slate-500">
+                  {lowStock.length} item{lowStock.length === 1 ? "" : "s"} running low
+                  {criticalStock > 0 ? `, ${criticalStock} critical` : ""}
+                </p>
+              )}
+            </div>
+            <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
+              <Pill size={18} />
+            </div>
           </div>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-2.5">
             {lowStock.length > 0 ? (
-              lowStock.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 transition-colors hover:bg-amber-100/70"
-                >
-                  <p className="font-semibold text-slate-900">{item.name}</p>
-                  <p className="text-sm font-medium text-amber-700">
-                    {item.quantity} {item.unit || "units"}
-                  </p>
-                </div>
-              ))
+              lowStock.map((item) => {
+                const critical = Number(item.quantity) <= 3;
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors ${
+                      critical
+                        ? "border-rose-200 bg-rose-50 hover:bg-rose-100/70"
+                        : "border-amber-200 bg-amber-50 hover:bg-amber-100/70"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {critical && <AlertTriangle size={14} className="shrink-0 text-rose-600" />}
+                      <p className="font-semibold text-slate-900">{item.name}</p>
+                    </div>
+                    <p className={`text-sm font-medium ${critical ? "text-rose-700" : "text-amber-700"}`}>
+                      {item.quantity} {item.unit || "units"}
+                    </p>
+                  </div>
+                );
+              })
             ) : (
-              <p className="text-sm text-slate-500">No low-stock medicines right now.</p>
+              <EmptyState
+                icon={Check}
+                title="Stock levels look good"
+                description="No medicines are running low right now."
+              />
             )}
           </div>
         </div>

@@ -22,6 +22,7 @@ class User extends Authenticatable
         'email',
         'password',
         'phone',
+        'profile_picture',
         'status',
     ];
 
@@ -45,6 +46,10 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
+    protected $appends = [
+        'avatar_url',
+    ];
+
     /**
      * Relationships
      */
@@ -56,5 +61,12 @@ class User extends Authenticatable
     public function doctor()
     {
         return $this->hasOne(Doctor::class);
+    }
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        return $this->profile_picture
+            ? asset('storage/' . $this->profile_picture)
+            : null;
     }
 }

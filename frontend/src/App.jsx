@@ -1,9 +1,10 @@
+import { useState } from "react";
 import {
-    Navigate,
-    Outlet,
-    Route,
-    Routes,
-    useNavigate,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useNavigate,
 } from "react-router-dom";
 
 import { useAuth } from "./context/AuthContext";
@@ -41,24 +42,25 @@ import Unauthorized from "./pages/Unauthorized";
 function DashboardShell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
 
+  const mainPaddingClass = sidebarCollapsed ? "lg:pl-20" : "lg:pl-64";
+
   return (
     <div className="min-h-screen bg-slate-50 relative dark:bg-slate-950">
-      {/* Sidebar - Fixed w-64 */}
-      <Sidebar />
+      <Sidebar onCollapseChange={setSidebarCollapsed} />
 
-      {/* Main Content Area - Placed to the right of the sidebar with pl-64 */}
-      <div className="lg:pl-64 min-h-screen flex flex-col transition-all duration-300">
-        {/* Navbar */}
+      <div
+        className={`min-h-screen flex flex-col transition-[padding] duration-300 ${mainPaddingClass}`}
+      >
         <Navbar user={user} onLogout={handleLogout} />
 
-        {/* Dynamic Outlet Page Content */}
-        <main className="flex-1 bg-slate-50 p-4 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100 sm:p-6 lg:p-8">
+        <main className="flex-1 bg-slate-50 px-4 py-4 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
           <Outlet />
         </main>
       </div>
@@ -71,107 +73,101 @@ function DashboardShell() {
 // ========================================
 
 function App() {
-    return (
-        <Routes>
-            {/* =================================
-                PUBLIC ROUTES
-            ================================= */}
-            <Route
-                path="/"
-                element={<Navigate to="/dashboard" replace />}
-            />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+  return (
+    <Routes>
+      {/* =================================
+          PUBLIC ROUTES
+      ================================= */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
-            {/* =================================
-                SHARED PROTECTED ROUTES
-            ================================= */}
-            <Route
-                element={
-                    <ProtectedRoute
-                        allowedRoles={[
-                            "Admin",
-                            "Doctor",
-                            "Receptionist",
-                        ]}
-                    />
-                }
-            >
-                <Route element={<DashboardShell />}>
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/appointments" element={<Appointments />} />
-                    <Route path="/doctors" element={<Doctor />} />
-                    <Route path="/patients" element={<Patients />} />
-                    <Route path="/medicines" element={<Medicines />} />
-                    <Route path="/inventory" element={<Inventory />} />
-                    <Route path="/profile" element={<Profile />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/support" element={<Support />} />
-                </Route>
-            </Route>
+      {/* =================================
+          SHARED PROTECTED ROUTES
+      ================================= */}
+      <Route
+        element={
+          <ProtectedRoute
+            allowedRoles={[
+              "Admin",
+              "Doctor",
+              "Receptionist",
+            ]}
+          />
+        }
+      >
+        <Route element={<DashboardShell />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/appointments" element={<Appointments />} />
+          <Route path="/doctors" element={<Doctor />} />
+          <Route path="/patients" element={<Patients />} />
+          <Route path="/medicines" element={<Medicines />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/support" element={<Support />} />
+        </Route>
+      </Route>
 
-            {/* =================================
-                CLINICAL ROUTES
-                Admin + Doctor
-            ================================= */}
-            <Route
-                element={
-                    <ProtectedRoute
-                        allowedRoles={["Admin", "Doctor"]}
-                    />
-                }
-            >
-                <Route element={<DashboardShell />}>
-                    <Route path="/medical-records" element={<MedicalRecords />} />
-                    <Route path="/prescriptions" element={<Prescriptions />} />
-                </Route>
-            </Route>
+      {/* =================================
+          CLINICAL ROUTES
+          Admin + Doctor
+      ================================= */}
+      <Route
+        element={
+          <ProtectedRoute
+            allowedRoles={["Admin", "Doctor"]}
+          />
+        }
+      >
+        <Route element={<DashboardShell />}>
+          <Route path="/medical-records" element={<MedicalRecords />} />
+          <Route path="/prescriptions" element={<Prescriptions />} />
+        </Route>
+      </Route>
 
-            {/* =================================
-                FRONT DESK ROUTES
-                Admin + Receptionist
-            ================================= */}
-            <Route
-                element={
-                    <ProtectedRoute
-                        allowedRoles={["Admin", "Receptionist"]}
-                    />
-                }
-            >
-                <Route element={<DashboardShell />}>
-                    <Route path="/departments" element={<Departments />} />
-                    <Route path="/payments" element={<Payments />} />
-                    <Route path="/billing" element={<Billing />} />
-                </Route>
-            </Route>
+      {/* =================================
+          FRONT DESK ROUTES
+          Admin + Receptionist
+      ================================= */}
+      <Route
+        element={
+          <ProtectedRoute
+            allowedRoles={["Admin", "Receptionist"]}
+          />
+        }
+      >
+        <Route element={<DashboardShell />}>
+          <Route path="/departments" element={<Departments />} />
+          <Route path="/payments" element={<Payments />} />
+          <Route path="/billing" element={<Billing />} />
+        </Route>
+      </Route>
 
-            {/* =================================
-                ADMIN ROUTES
-            ================================= */}
-            <Route
-                element={
-                    <ProtectedRoute
-                        allowedRoles={["Admin"]}
-                    />
-                }
-            >
-                <Route element={<DashboardShell />}>
-                    <Route path="/reports" element={<Reports />} />
-                    <Route path="/users" element={<User />} />
-                </Route>
-            </Route>
+      {/* =================================
+          ADMIN ROUTES
+      ================================= */}
+      <Route
+        element={
+          <ProtectedRoute
+            allowedRoles={["Admin"]}
+          />
+        }
+      >
+        <Route element={<DashboardShell />}>
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/users" element={<User />} />
+        </Route>
+      </Route>
 
-            <Route path="/403" element={<Unauthorized />} />
+      <Route path="/403" element={<Unauthorized />} />
 
-            {/* =================================
-                NOT FOUND
-            ================================= */}
-            <Route
-                path="*"
-                element={<Navigate to="/dashboard" replace />}
-            />
-        </Routes>
-    );
+      {/* =================================
+          NOT FOUND
+      ================================= */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
 }
 
 export default App;
