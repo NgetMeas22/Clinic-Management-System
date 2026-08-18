@@ -17,88 +17,87 @@ use App\Http\Controllers\AppointmentController;
 // Public Routes
 Route::post('/login', [AuthController::class, 'login']);
 
-// Routes for ALL authenticated users (Patients, Doctors, Admins, etc.)
+// Authenticated Routes
 Route::middleware('auth:sanctum')->group(function () {
+    // Auth & Profile
     Route::get('/me', [AuthController::class, 'me']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
     Route::put('/password', [AuthController::class, 'changePassword']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::get('/dashboard', [DashboardController::class, 'index'])
-        ->middleware('role:admin,doctor,receptionist');
-    Route::get('/dashboard/weekly', [DashboardController::class, 'weekly'])
-        ->middleware('role:admin,doctor,receptionist');
-    Route::get('/dashboard/daily-this-month', [DashboardController::class, 'dailyThisMonth'])
-        ->middleware('role:admin,doctor,receptionist');
-    Route::get('/dashboard/monthly', [DashboardController::class, 'monthly'])
-        ->middleware('role:admin,doctor,receptionist');
+    // Dashboard Routes (Admin, Doctor, Receptionist)
+    Route::middleware('role:admin,doctor,receptionist')->group(function () {
+        Route::get('/dashboard', [DashboardController::class, 'index']);
+        Route::get('/dashboard/weekly', [DashboardController::class, 'weekly']);
+        Route::get('/dashboard/daily-this-month', [DashboardController::class, 'dailyThisMonth']);
+        Route::get('/dashboard/monthly', [DashboardController::class, 'monthly']);
+    });
 
-    Route::apiResource('departments', DepartmentController::class)
-        ->only(['index', 'show'])
-        ->middleware('role:admin,receptionist');
-    Route::apiResource('departments', DepartmentController::class)
-        ->only(['store', 'update', 'destroy'])
-        ->middleware('role:admin');
+    // Departments (FIXED: Added doctor role here)
+    Route::get('/departments', [DepartmentController::class, 'index'])->middleware('role:admin,doctor,receptionist');
+    Route::get('/departments/{department}', [DepartmentController::class, 'show'])->middleware('role:admin,doctor,receptionist');
 
-    Route::apiResource('doctors', DoctorController::class)
-        ->only(['index', 'show'])
-        ->middleware('role:admin,doctor,receptionist');
-    Route::apiResource('doctors', DoctorController::class)
-        ->only(['store', 'update', 'destroy'])
-        ->middleware('role:admin');
+    // Doctors
+    Route::get('/doctors', [DoctorController::class, 'index'])->middleware('role:admin,doctor,receptionist');
+    Route::get('/doctors/{doctor}', [DoctorController::class, 'show'])->middleware('role:admin,doctor,receptionist');
 
-    Route::apiResource('patients', PatientController::class)
-        ->only(['index', 'show'])
-        ->middleware('role:admin,doctor,receptionist');
-    Route::apiResource('patients', PatientController::class)
-        ->only(['store', 'update'])
-        ->middleware('role:admin,receptionist');
-    Route::apiResource('patients', PatientController::class)
-        ->only(['destroy'])
-        ->middleware('role:admin');
+    // Patients
+    Route::get('/patients', [PatientController::class, 'index'])->middleware('role:admin,doctor,receptionist');
+    Route::get('/patients/{patient}', [PatientController::class, 'show'])->middleware('role:admin,doctor,receptionist');
+    Route::post('/patients', [PatientController::class, 'store'])->middleware('role:admin,receptionist');
+    Route::put('/patients/{patient}', [PatientController::class, 'update'])->middleware('role:admin,receptionist');
 
-    Route::apiResource('appointments', AppointmentController::class)
-        ->only(['index', 'show', 'update'])
-        ->middleware('role:admin,doctor,receptionist');
-    Route::apiResource('appointments', AppointmentController::class)
-        ->only(['store'])
-        ->middleware('role:admin,receptionist');
-    Route::apiResource('appointments', AppointmentController::class)
-        ->only(['destroy'])
-        ->middleware('role:admin');
+    // Appointments
+    Route::get('/appointments', [AppointmentController::class, 'index'])->middleware('role:admin,doctor,receptionist');
+    Route::get('/appointments/{appointment}', [AppointmentController::class, 'show'])->middleware('role:admin,doctor,receptionist');
+    Route::put('/appointments/{appointment}', [AppointmentController::class, 'update'])->middleware('role:admin,doctor,receptionist');
+    Route::post('/appointments', [AppointmentController::class, 'store'])->middleware('role:admin,receptionist');
+    Route::delete('/appointments/{appointment}', [AppointmentController::class, 'destroy'])->middleware('role:admin');
 
+    // Medical Records
     Route::apiResource('medical-records', MedicalRecordController::class)
         ->only(['index', 'show', 'store', 'update'])
         ->middleware('role:admin,doctor');
-    Route::apiResource('medical-records', MedicalRecordController::class)
-        ->only(['destroy'])
-        ->middleware('role:admin');
 
+    // Prescriptions
     Route::apiResource('prescriptions', PrescriptionController::class)
         ->only(['index', 'show', 'store', 'update'])
         ->middleware('role:admin,doctor');
-    Route::apiResource('prescriptions', PrescriptionController::class)
-        ->only(['destroy'])
-        ->middleware('role:admin');
 
-    Route::apiResource('medicines', MedicineController::class)
-        ->only(['index', 'show'])
-        ->middleware('role:admin,doctor,receptionist');
-    Route::apiResource('medicines', MedicineController::class)
-        ->only(['store', 'update', 'destroy'])
-        ->middleware('role:admin');
+    // Medicines
+    Route::get('/medicines', [MedicineController::class, 'index'])->middleware('role:admin,doctor,receptionist');
+    Route::get('/medicines/{medicine}', [MedicineController::class, 'show'])->middleware('role:admin,doctor,receptionist');
 
+    // Payments
     Route::apiResource('payments', PaymentController::class)
         ->only(['index', 'show', 'store', 'update'])
         ->middleware('role:admin,receptionist');
-    Route::apiResource('payments', PaymentController::class)
-        ->only(['destroy'])
-        ->middleware('role:admin');
 });
 
-// Admin-ONLY Routes
+// Admin ONLY Routes
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::apiResource('users', UserController::class);
+
+    // Admin-only management routes
+    Route::post('/departments', [DepartmentController::class, 'store']);
+    Route::put('/departments/{department}', [DepartmentController::class, 'update']);
+    Route::delete('/departments/{department}', [DepartmentController::class, 'destroy']);
+
+    Route::post('/doctors', [DoctorController::class, 'store']);
+    Route::put('/doctors/{doctor}', [DoctorController::class, 'update']);
+    Route::delete('/doctors/{doctor}', [DoctorController::class, 'destroy']);
+
+    Route::delete('/patients/{patient}', [PatientController::class, 'destroy']);
+    Route::delete('/medical-records/{medical_record}', [MedicalRecordController::class, 'destroy']);
+    Route::delete('/prescriptions/{prescription}', [PrescriptionController::class, 'destroy']);
+
+    Route::post('/medicines', [MedicineController::class, 'store']);
+    Route::put('/medicines/{medicine}', [MedicineController::class, 'update']);
+    Route::delete('/medicines/{medicine}', [MedicineController::class, 'destroy']);
+
+    Route::delete('/payments/{payment}', [PaymentController::class, 'destroy']);
+
+    // Reports
     Route::get('/reports/patients', [ReportController::class, 'patients']);
     Route::get('/reports/doctors', [ReportController::class, 'doctors']);
     Route::get('/reports/appointments', [ReportController::class, 'appointments']);

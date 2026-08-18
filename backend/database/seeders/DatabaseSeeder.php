@@ -5,6 +5,7 @@ namespace Database\Seeders;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
 use App\Models\Department;
+use App\Models\Doctor;
 use App\Models\Medicine;
 use App\Models\Role;
 // use App\Models\Patient;
@@ -52,6 +53,7 @@ class DatabaseSeeder extends Seeder
 
 
         $this->seedDepartments();
+        $this->seedDoctorProfiles();
         $this->seedMedicines();
     }
 
@@ -77,6 +79,24 @@ class DatabaseSeeder extends Seeder
 
         foreach ($departments as $department) {
             Department::firstOrCreate(['name' => $department['name']], $department);
+        }
+    }
+
+    private function seedDoctorProfiles(): void
+    {
+        $doctorUser = User::where('email', 'doctor@clinic.com')->first();
+        $department = Department::where('name', 'General Medicine')->first();
+
+        if ($doctorUser && $department) {
+            Doctor::updateOrCreate(['user_id' => $doctorUser->id], [
+                'department_id' => $department->id,
+                'specialization' => 'General Medicine',
+                'license_number' => 'LIC-SEED-001',
+                'gender' => 'male',
+                'date_of_birth' => '1980-01-01',
+                'address' => 'Phnom Penh',
+                'status' => 'active',
+            ]);
         }
     }
 

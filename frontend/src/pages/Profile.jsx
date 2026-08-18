@@ -7,7 +7,7 @@ export default function Profile() {
   
   const [form, setForm] = useState(() => ({
     name: user?.name || "",
-    email: user?.email || "",
+    email: user?.email || "", 
     phone: user?.phone || "",
   }));
   const [avatarPreview, setAvatarPreview] = useState(() => user?.avatar_url || "");

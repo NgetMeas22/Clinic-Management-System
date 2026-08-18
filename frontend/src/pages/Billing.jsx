@@ -346,7 +346,7 @@ const Billing = () => {
 
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-3 mb-4">
-                <div className="relative flex-1 min-w-[220px]">
+                <div className="relative flex-1 min-w-55">
                     <Icon.Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                         type="text"

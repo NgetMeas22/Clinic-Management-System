@@ -47,7 +47,10 @@ class MedicalRecordController extends Controller
                 $doctorId = $this->doctorId($request);
 
                 if (!$doctorId) {
-                    return $this->forbidden();
+                    return response()->json([
+                        'success' => true,
+                        'data' => MedicalRecord::query()->where('id', 0)->paginate(10),
+                    ], 200);
                 }
 
                 $query->where('doctor_id', $doctorId);
