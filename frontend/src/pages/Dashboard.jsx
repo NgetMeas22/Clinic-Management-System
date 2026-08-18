@@ -6,6 +6,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -13,18 +16,22 @@ import {
 } from "recharts";
 import {
   AlertTriangle,
+  Award,
   Banknote,
   Calendar,
   CalendarX2,
   Check,
   ChevronRight,
   Clock,
+  Download,
   Eye,
   Loader2,
   MoreVertical,
   Pill,
   Plus,
+  Printer,
   RefreshCcw,
+  Search,
   Stethoscope,
   TrendingDown,
   TrendingUp,
@@ -52,6 +59,15 @@ const STATUS_STYLES = {
   cancelled: "bg-rose-50 text-rose-700 ring-rose-600/20",
   completed: "bg-slate-100 text-slate-600 ring-slate-500/20",
 };
+
+const STATUS_HEX = {
+  confirmed: "#10b981",
+  pending: "#f59e0b",
+  cancelled: "#f43f5e",
+  completed: "#94a3b8",
+};
+
+const STATUS_FILTERS = ["all", "confirmed", "pending", "cancelled", "completed"];
 
 // Deterministic avatar tint so the same name always gets the same color,
 // giving the table a bit of visual variety instead of one flat blue.
@@ -92,6 +108,34 @@ function formatUpdatedAt(date) {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
 }
 
+function formatToday() {
+  return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
+}
+
+// Client-side CSV export of whatever appointment rows are currently visible —
+// keeps this a genuinely usable feature without requiring a new API endpoint.
+function downloadCsv(rows) {
+  if (!rows.length) return;
+  const header = ["Patient", "Doctor", "Time", "Status"];
+  const lines = rows.map((appt) => {
+    const patientName =
+      `${appt.patient?.first_name || ""} ${appt.patient?.last_name || ""}`.trim() || "Unknown";
+    const doctorName = appt.doctor?.user?.name || appt.doctor_name || "—";
+    const apptTime = appt.appointment_time || appt.time || "—";
+    return [patientName, doctorName, apptTime, appt.status || ""]
+      .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+      .join(",");
+  });
+  const csv = [header.join(","), ...lines].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `appointments-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function TrendBadge({ value }) {
   if (value === undefined || value === null || Number.isNaN(Number(value))) return null;
   const numeric = Number(value);
@@ -120,6 +164,34 @@ function ChartTooltip({ active, payload, label }) {
           <span className="ml-1 text-xs font-normal capitalize text-slate-400">{entry.dataKey}</span>
         </p>
       ))}
+    </div>
+  );
+}
+
+// Tiny inline trend line used inside each stat card — gives the raw number
+// some shape without competing with the main charts below.
+function Sparkline({ data, dataKey, color }) {
+  if (!data?.length) return null;
+  return (
+    <div className="h-10 w-20 shrink-0 opacity-90">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`spark-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <Area
+            type="monotone"
+            dataKey={dataKey}
+            stroke={color}
+            strokeWidth={1.75}
+            fill={`url(#spark-${dataKey})`}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -213,6 +285,10 @@ export default function Dashboard() {
   const [rangeCache, setRangeCache] = useState({});
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeError, setRangeError] = useState("");
+
+  const [apptSearch, setApptSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [visibleRows, setVisibleRows] = useState(5);
 
   const loadDashboard = useCallback(async ({ silent } = {}) => {
     try {
@@ -353,6 +429,49 @@ export default function Dashboard() {
   const lowStock = medicines.filter((item) => Number(item.quantity) <= 10).slice(0, 5);
   const criticalStock = lowStock.filter((item) => Number(item.quantity) <= 3).length;
 
+  const pendingCount = recentAppointments.filter((a) => (a.status || "").toLowerCase() === "pending").length;
+  const showAttentionBanner = !loading && (lowStock.length > 0 || pendingCount > 0);
+
+  // Status distribution for the donut — computed from whatever appointment
+  // data is already on the page, no extra request needed.
+  const statusBreakdown = useMemo(() => {
+    const counts = {};
+    recentAppointments.forEach((a) => {
+      const key = (a.status || "unknown").toLowerCase();
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .filter(([, value]) => value > 0)
+      .map(([key, value]) => ({ name: key, value }));
+  }, [recentAppointments]);
+
+  // Doctors ranked by how many of the loaded appointments belong to them —
+  // a lightweight "who's busiest" view without a dedicated endpoint.
+  const topDoctors = useMemo(() => {
+    const counts = {};
+    recentAppointments.forEach((a) => {
+      const name = a.doctor?.user?.name || a.doctor_name;
+      if (!name) return;
+      counts[name] = (counts[name] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4);
+  }, [recentAppointments]);
+
+  const filteredAppointments = useMemo(() => {
+    const q = apptSearch.trim().toLowerCase();
+    return recentAppointments.filter((appt) => {
+      const status = (appt.status || "").toLowerCase();
+      if (statusFilter !== "all" && status !== statusFilter) return false;
+      if (!q) return true;
+      const patientName = `${appt.patient?.first_name || ""} ${appt.patient?.last_name || ""}`.toLowerCase();
+      const doctorName = (appt.doctor?.user?.name || appt.doctor_name || "").toLowerCase();
+      return patientName.includes(q) || doctorName.includes(q);
+    });
+  }, [recentAppointments, apptSearch, statusFilter]);
+
   const cards = [
     {
       label: "Total patients",
@@ -360,6 +479,8 @@ export default function Dashboard() {
       icon: Users,
       trend: stats?.total_patients_trend,
       tint: "bg-blue-50 text-blue-600",
+      sparkKey: "patients",
+      sparkColor: "#2563eb",
     },
     {
       label: "Total doctors",
@@ -367,6 +488,8 @@ export default function Dashboard() {
       icon: Stethoscope,
       trend: stats?.total_doctors_trend,
       tint: "bg-violet-50 text-violet-600",
+      sparkKey: null,
+      sparkColor: "#7c3aed",
     },
     {
       label: "Appointments today",
@@ -374,6 +497,8 @@ export default function Dashboard() {
       icon: Calendar,
       trend: stats?.appointments_today_trend,
       tint: "bg-amber-50 text-amber-600",
+      sparkKey: "appointments",
+      sparkColor: "#d97706",
     },
     {
       label: "Total revenue",
@@ -381,6 +506,8 @@ export default function Dashboard() {
       icon: Banknote,
       trend: stats?.total_revenue_trend,
       tint: "bg-emerald-50 text-emerald-600",
+      sparkKey: "revenue",
+      sparkColor: "#059669",
     },
   ];
 
@@ -413,15 +540,42 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6" onClick={() => openMenuId && setOpenMenuId(null)}>
+      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+          <div className="flex items-center gap-2.5">
+            <span className="h-6 w-1 rounded-full bg-blue-600" />
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+            {user?.role && (
+              <span className="rounded-full bg-slate-900 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">
+                {user.role}
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-slate-500">
-            Welcome back{user?.name ? `, ${user.name}` : ""}. Here's your {user?.role ? `${user.role} ` : ""}
-            summary for today.
+            {formatToday()} · Welcome back{user?.name ? `, ${user.name}` : ""}.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
+            title="Print this dashboard"
+          >
+            <Printer size={16} />
+            <span className="hidden md:inline">Print</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadCsv(filteredAppointments)}
+            disabled={!filteredAppointments.length}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            title="Export visible appointments as CSV"
+          >
+            <Download size={16} />
+            <span className="hidden md:inline">Export</span>
+          </button>
           <button
             type="button"
             onClick={() => loadDashboard({ silent: true })}
@@ -467,6 +621,47 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Needs attention */}
+      {showAttentionBanner && (
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-linear-to-r from-amber-50 to-white p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+              <AlertTriangle size={16} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Needs attention</p>
+              <p className="text-xs text-slate-500">
+                {lowStock.length > 0 &&
+                  `${lowStock.length} medicine${lowStock.length === 1 ? "" : "s"} running low${
+                    criticalStock > 0 ? ` (${criticalStock} critical)` : ""
+                  }`}
+                {lowStock.length > 0 && pendingCount > 0 && " · "}
+                {pendingCount > 0 && `${pendingCount} appointment${pendingCount === 1 ? "" : "s"} awaiting confirmation`}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {lowStock.length > 0 && (
+              <Link
+                to="/medicines"
+                className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 shadow-sm hover:bg-amber-50"
+              >
+                Review stock
+              </Link>
+            )}
+            {pendingCount > 0 && (
+              <Link
+                to="/appointments"
+                className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 shadow-sm hover:bg-amber-50"
+              >
+                Review appointments
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.icon;
@@ -482,14 +677,22 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="mt-4 flex items-end justify-between">
-                <p className="text-3xl font-bold text-slate-900">{card.value}</p>
-                <TrendBadge value={card.trend} />
+                <div>
+                  <p className="text-3xl font-bold text-slate-900">{card.value}</p>
+                  <div className="mt-1.5">
+                    <TrendBadge value={card.trend} />
+                  </div>
+                </div>
+                {card.sparkKey && (
+                  <Sparkline data={chartData} dataKey={card.sparkKey} color={card.sparkColor} />
+                )}
               </div>
             </div>
           );
         })}
       </div>
 
+      {/* Trends */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-bold text-slate-900">Trends</h2>
@@ -621,9 +824,10 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Appointments + inventory */}
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md xl:col-span-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-base font-bold text-slate-900">Recent appointments</h2>
             <Link
               to="/appointments"
@@ -633,7 +837,38 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          {recentAppointments.length > 0 ? (
+          {recentAppointments.length > 0 && (
+            <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-xs">
+                <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={apptSearch}
+                  onChange={(e) => setApptSearch(e.target.value)}
+                  placeholder="Search patient or doctor…"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {STATUS_FILTERS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setStatusFilter(s)}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize transition ${
+                      statusFilter === s
+                        ? "bg-slate-900 text-white"
+                        : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filteredAppointments.length > 0 ? (
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
@@ -646,7 +881,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {recentAppointments.slice(0, 5).map((appt) => {
+                  {filteredAppointments.slice(0, visibleRows).map((appt) => {
                     const status = (appt.status || "").toLowerCase();
                     const patientName =
                       `${appt.patient?.first_name || ""} ${appt.patient?.last_name || ""}`.trim() || "Unknown";
@@ -656,13 +891,21 @@ export default function Dashboard() {
                       <tr key={appt.id} className="text-slate-700 transition-colors hover:bg-slate-50">
                         <td className="py-3 pr-4">
                           <div className="flex items-center gap-3">
-                            <span
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarTint(
-                                patientName
-                              )}`}
-                            >
-                              {initialsOf(patientName)}
-                            </span>
+                            {appt.patient?.avatar_url ? (
+                              <img
+                                src={appt.patient.avatar_url}
+                                alt={patientName}
+                                className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-slate-200"
+                              />
+                            ) : (
+                              <span
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarTint(
+                                  patientName
+                                )}`}
+                              >
+                                {initialsOf(patientName)}
+                              </span>
+                            )}
                             <span className="font-medium text-slate-900">{patientName}</span>
                           </div>
                         </td>
@@ -721,64 +964,163 @@ export default function Dashboard() {
                   })}
                 </tbody>
               </table>
+              {filteredAppointments.length > visibleRows && (
+                <button
+                  type="button"
+                  onClick={() => setVisibleRows((n) => n + 5)}
+                  className="mt-3 w-full rounded-lg border border-dashed border-slate-200 py-2 text-xs font-semibold text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                >
+                  Show more ({filteredAppointments.length - visibleRows} remaining)
+                </button>
+              )}
             </div>
           ) : (
             <div className="mt-4">
               <EmptyState
-                icon={CalendarX2}
-                title="No recent appointments"
-                description="New bookings will show up here as soon as they're scheduled."
+                icon={recentAppointments.length > 0 ? Search : CalendarX2}
+                title={recentAppointments.length > 0 ? "No matching appointments" : "No recent appointments"}
+                description={
+                  recentAppointments.length > 0
+                    ? "Try a different search term or status filter."
+                    : "New bookings will show up here as soon as they're scheduled."
+                }
               />
             </div>
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Inventory alerts</h2>
-              {lowStock.length > 0 && (
-                <p className="text-xs text-slate-500">
-                  {lowStock.length} item{lowStock.length === 1 ? "" : "s"} running low
-                  {criticalStock > 0 ? `, ${criticalStock} critical` : ""}
-                </p>
+        <div className="flex flex-col gap-4">
+          {/* Status breakdown */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+            <h2 className="text-base font-bold text-slate-900">Status breakdown</h2>
+            <p className="text-xs text-slate-500">Loaded appointments by status</p>
+            {statusBreakdown.length > 0 ? (
+              <div className="mt-2 flex items-center gap-4">
+                <div className="h-28 w-28 shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={statusBreakdown}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={32}
+                        outerRadius={52}
+                        paddingAngle={2}
+                        stroke="none"
+                      >
+                        {statusBreakdown.map((entry) => (
+                          <Cell key={entry.name} fill={STATUS_HEX[entry.name] || "#cbd5e1"} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  {statusBreakdown.map((entry) => (
+                    <div key={entry.name} className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1.5 capitalize text-slate-600">
+                        <span
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: STATUS_HEX[entry.name] || "#cbd5e1" }}
+                        />
+                        {entry.name}
+                      </span>
+                      <span className="font-semibold text-slate-900">{entry.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-6 text-center text-xs text-slate-400">No appointment data yet.</p>
+            )}
+          </div>
+
+          {/* Top doctors */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-900">Busiest doctors</h2>
+              <Award size={16} className="text-slate-300" />
+            </div>
+            <p className="text-xs text-slate-500">By loaded appointments</p>
+            <div className="mt-3 space-y-2.5">
+              {topDoctors.length > 0 ? (
+                topDoctors.map((doc, i) => (
+                  <div key={doc.name} className="flex items-center gap-3">
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarTint(
+                        doc.name
+                      )}`}
+                    >
+                      {initialsOf(doc.name) || i + 1}
+                    </span>
+                    <span className="flex-1 truncate text-sm font-medium text-slate-700">{doc.name}</span>
+                    <span className="text-xs font-semibold text-slate-400">{doc.count}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-xs text-slate-400">No doctor data yet.</p>
               )}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Inventory alerts */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Inventory alerts</h2>
+            {lowStock.length > 0 && (
+              <p className="text-xs text-slate-500">
+                {lowStock.length} item{lowStock.length === 1 ? "" : "s"} running low
+                {criticalStock > 0 ? `, ${criticalStock} critical` : ""}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/medicines"
+              className="hidden text-xs font-semibold text-blue-600 hover:text-blue-700 sm:inline-flex sm:items-center sm:gap-1"
+            >
+              Manage inventory <ChevronRight size={12} />
+            </Link>
             <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
               <Pill size={18} />
             </div>
           </div>
-          <div className="mt-4 space-y-2.5">
-            {lowStock.length > 0 ? (
-              lowStock.map((item) => {
-                const critical = Number(item.quantity) <= 3;
-                return (
-                  <div
-                    key={item.id}
-                    className={`flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors ${
-                      critical
-                        ? "border-rose-200 bg-rose-50 hover:bg-rose-100/70"
-                        : "border-amber-200 bg-amber-50 hover:bg-amber-100/70"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {critical && <AlertTriangle size={14} className="shrink-0 text-rose-600" />}
-                      <p className="font-semibold text-slate-900">{item.name}</p>
-                    </div>
-                    <p className={`text-sm font-medium ${critical ? "text-rose-700" : "text-amber-700"}`}>
-                      {item.quantity} {item.unit || "units"}
-                    </p>
+        </div>
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+          {lowStock.length > 0 ? (
+            lowStock.map((item) => {
+              const critical = Number(item.quantity) <= 3;
+              return (
+                <div
+                  key={item.id}
+                  className={`flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors ${
+                    critical
+                      ? "border-rose-200 bg-rose-50 hover:bg-rose-100/70"
+                      : "border-amber-200 bg-amber-50 hover:bg-amber-100/70"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {critical && <AlertTriangle size={14} className="shrink-0 text-rose-600" />}
+                    <p className="font-semibold text-slate-900">{item.name}</p>
                   </div>
-                );
-              })
-            ) : (
+                  <p className={`text-sm font-medium ${critical ? "text-rose-700" : "text-amber-700"}`}>
+                    {item.quantity} {item.unit || "units"}
+                  </p>
+                </div>
+              );
+            })
+          ) : (
+            <div className="sm:col-span-2 xl:col-span-3">
               <EmptyState
                 icon={Check}
                 title="Stock levels look good"
                 description="No medicines are running low right now."
               />
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

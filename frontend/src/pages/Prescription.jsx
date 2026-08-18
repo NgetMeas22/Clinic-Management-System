@@ -162,9 +162,17 @@ const Prescriptions = () => {
                 {/* Prescription Header Info */}
                 <div className="flex flex-wrap justify-between items-start border-b border-slate-100 pb-4 mb-4 gap-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 font-bold text-sm flex items-center justify-center shrink-0">
-                      {initials(prescription.patient?.first_name, prescription.patient?.last_name)}
-                    </div>
+                    {prescription.patient?.avatar_url ? (
+                      <img
+                        src={prescription.patient.avatar_url}
+                        alt="Patient"
+                        className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-slate-200"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 font-bold text-sm flex items-center justify-center shrink-0">
+                        {initials(prescription.patient?.first_name, prescription.patient?.last_name)}
+                      </div>
+                    )}
                     <div>
                       <h2 className="font-bold text-lg text-slate-900">
                         {prescription.patient

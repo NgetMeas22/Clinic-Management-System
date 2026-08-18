@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   SlidersHorizontal,
@@ -11,6 +12,8 @@ import {
   Trash2,
   X,
   Users,
+  User,
+  Camera,
 } from "lucide-react";
 import {
   getPatients,
@@ -94,6 +97,7 @@ const initialFormState = {
   phone: "",
   email: "",
   address: "",
+  avatar: "",
   emergency_contact: "",
   emergency_phone: "",
   status: "active",
@@ -104,11 +108,12 @@ const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function Patients() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Search & filter state
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("All Patients");
 
   // Modal & form state
@@ -117,6 +122,7 @@ export default function Patients() {
   const [submitting, setSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState(null);
   const [activeMenuId, setActiveMenuId] = useState(null);
+  const [avatarFile, setAvatarFile] = useState(null);
   const menuRef = useRef(null);
 
   const [formData, setFormData] = useState(initialFormState);
@@ -169,8 +175,21 @@ export default function Patients() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // Reads a selected image file for preview + keeps it for multipart upload
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFormData((prev) => ({ ...prev, avatar: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleOpenAddModal = () => {
     setEditingPatientId(null);
+    setAvatarFile(null);
     setFormData(initialFormState);
     setFormErrors(null);
     setIsModalOpen(true);
@@ -178,6 +197,7 @@ export default function Patients() {
 
   const handleOpenEditModal = (patient) => {
     setEditingPatientId(patient.id);
+    setAvatarFile(null);
     setFormData({
       patient_code: patient.patient_code || "",
       first_name: patient.first_name || patient.name?.split(" ")[0] || "",
@@ -189,6 +209,7 @@ export default function Patients() {
       phone: patient.phone || "",
       email: patient.email || "",
       address: patient.address || "",
+      avatar: patient.avatar_url || patient.avatar || "",
       emergency_contact: patient.emergency_contact || "",
       emergency_phone: patient.emergency_phone || "",
       status: patient.status ? patient.status.toLowerCase() : "active",
@@ -214,11 +235,9 @@ export default function Patients() {
       return;
     }
 
-    // Build a payload that matches the `patients` table exactly:
-    //   gender ENUM('male','female','other')
-    //   status ENUM('active','inactive')
-    // Both must be sent lowercase or MySQL rejects the insert/update with a 500.
-    const payload = {
+    // If a new photo was picked, send multipart so the backend can store the
+    // file; otherwise send the plain JSON payload as before.
+    const basePayload = {
       patient_code:
         formData.patient_code ||
         (editingPatientId
@@ -236,6 +255,17 @@ export default function Patients() {
       emergency_phone: formData.emergency_phone.trim() || null,
       status: formData.status.toLowerCase(),
     };
+
+    const payload = avatarFile
+      ? (() => {
+          const fd = new FormData();
+          Object.entries(basePayload).forEach(([key, value]) => {
+            if (value !== null && value !== undefined) fd.append(key, value);
+          });
+          fd.append("avatar", avatarFile);
+          return fd;
+        })()
+      : basePayload;
 
     setSubmitting(true);
     try {
@@ -257,6 +287,7 @@ export default function Patients() {
       }
 
       setIsModalOpen(false);
+      setAvatarFile(null);
       setFormData(initialFormState);
     } catch (error) {
       // Log the full response so the real backend validation/SQL error is visible
@@ -481,11 +512,19 @@ export default function Patients() {
                     <tr key={patient.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3.5">
-                          <div
-                            className={`w-10 h-10 rounded-full ${avatarColor.bg} ${avatarColor.text} font-bold flex items-center justify-center text-xs shrink-0`}
-                          >
-                            {initials}
-                          </div>
+                          {patient.avatar_url || patient.avatar ? (
+                            <img
+                              src={patient.avatar_url || patient.avatar}
+                              alt={fullName}
+                              className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-slate-200"
+                            />
+                          ) : (
+                            <div
+                              className={`w-10 h-10 rounded-full ${avatarColor.bg} ${avatarColor.text} font-bold flex items-center justify-center text-xs shrink-0`}
+                            >
+                              {initials}
+                            </div>
+                          )}
                           <div>
                             <div className="font-bold text-slate-900 text-base leading-tight">
                               {fullName}
@@ -636,6 +675,50 @@ export default function Patients() {
                 <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   Personal Information
                 </h4>
+                {/* Photo upload */}
+                <div className="flex items-center gap-4">
+                  <label className="relative cursor-pointer group shrink-0">
+                    {formData.avatar ? (
+                      <img
+                        src={formData.avatar}
+                        alt="Avatar preview"
+                        className="w-16 h-16 rounded-full object-cover ring-2 ring-slate-200"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                        <User size={24} />
+                      </div>
+                    )}
+                    <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center ring-2 ring-white group-hover:bg-blue-700 transition-colors">
+                      <Camera size={12} />
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                    />
+                  </label>
+                  <div>
+                    <p className="text-xs font-bold text-slate-700">Patient Photo</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      JPG, PNG, or WEBP up to 2 MB.
+                    </p>
+                    {avatarFile && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarFile(null);
+                          setFormData((prev) => ({ ...prev, avatar: "" }));
+                        }}
+                        className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700"
+                      >
+                        <X size={12} />
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">First Name *</label>

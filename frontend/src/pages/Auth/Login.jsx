@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { useLocale } from "../../context/LocaleContext";
+import LanguageSwitcher from "../../components/LanguageSwitcher";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function Login() {
@@ -11,6 +13,7 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { login } = useAuth();
+  const { t, localizedPath } = useLocale();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -20,7 +23,7 @@ export default function Login() {
 
     try {
       await login(email, password, rememberMe);
-      navigate("/dashboard");
+      navigate(localizedPath("/dashboard"));
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -34,6 +37,11 @@ export default function Login() {
 
   return (
     <div className="h-screen bg-slate-100/70 flex flex-col items-center justify-center p-4 overflow-hidden">
+      {/* Language toggle */}
+      <div className="fixed top-4 right-4">
+        <LanguageSwitcher compact />
+      </div>
+
       {/* Container resized to max-w-lg matching Register */}
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         
@@ -48,7 +56,7 @@ export default function Login() {
             NGM<span className="text-blue-600">Clinic</span>
           </h1>
           <p className="text-xs text-slate-500 font-medium">
-            Secure Clinical Portal
+            {t("login.securePortal")}
           </p>
         </div>
 
@@ -56,10 +64,10 @@ export default function Login() {
         <div className="p-6">
           <div className="mb-4">
             <h2 className="text-base font-bold text-slate-800">
-              Welcome Back
+              {t("login.welcomeBack")}
             </h2>
             <p className="text-xs text-slate-500">
-              Sign in to access patient records and dashboard.
+              {t("login.signInSubtitle")}
             </p>
           </div>
 
@@ -88,7 +96,7 @@ export default function Login() {
             {/* Email Field */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Work Email Address
+                {t("login.workEmail")}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -121,14 +129,14 @@ export default function Login() {
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="block text-xs font-semibold text-slate-700">
-                  Password
+                  {t("login.password")}
                 </label>
                 <button
                   type="button"
-                  onClick={() => setError("Password reset is not available yet. Contact an administrator.")}
+                  onClick={() => setError(t("login.forgotNotAvailable"))}
                   className="text-xs font-medium text-blue-600 hover:text-blue-700"
                 >
-                  Forgot Password?
+                  {t("login.forgotPassword")}
                 </button>
               </div>
               <div className="relative">
@@ -181,7 +189,7 @@ export default function Login() {
                 className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
               <label htmlFor="remember-me" className="text-xs text-slate-600">
-                Remember me on this device
+                {t("login.rememberMe")}
               </label>
             </div>
 
@@ -197,11 +205,11 @@ export default function Login() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Signing in...
+                  {t("login.signingIn")}
                 </span>
               ) : (
                 <>
-                  Sign In
+                  {t("login.signIn")}
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
@@ -212,9 +220,9 @@ export default function Login() {
             {/* Register Link Footer */}
             <div className="pt-3 mt-4 border-t border-slate-100 text-center">
               <p className="text-xs text-slate-500">
-                Need an account?{" "}
-                <Link to="/register" className="font-semibold text-blue-600 hover:text-blue-700">
-                  Register as Staff
+                {t("login.needAccount")}{" "}
+                <Link to={localizedPath("/register")} className="font-semibold text-blue-600 hover:text-blue-700">
+                  {t("login.registerAsStaff")}
                 </Link>
               </p>
             </div>

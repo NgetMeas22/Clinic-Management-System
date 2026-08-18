@@ -199,12 +199,20 @@ export default function AppointmentsManager({
                       {/* Patient Name with Avatar Badge */}
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 text-xs font-semibold flex items-center justify-center shrink-0">
-                            {getInitials(
-                              item.patient?.first_name,
-                              item.patient?.last_name
-                            )}
-                          </div>
+                          {item.patient?.avatar_url ? (
+                            <img
+                              src={item.patient.avatar_url}
+                              alt={patientName}
+                              className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-slate-200"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 text-xs font-semibold flex items-center justify-center shrink-0">
+                              {getInitials(
+                                item.patient?.first_name,
+                                item.patient?.last_name
+                              )}
+                            </div>
+                          )}
                           <div>
                             <div className="font-semibold text-slate-900">
                               {patientName}
@@ -218,11 +226,22 @@ export default function AppointmentsManager({
 
                       {/* Doctor Name */}
                       <td className="py-4 px-6">
-                        <div className="font-semibold text-blue-600">
-                          {doctorName}
-                        </div>
-                        <div className="text-xs text-slate-400">
-                          {item.doctor?.specialization || "General Practice"}
+                        <div className="flex items-center gap-2.5">
+                          {item.doctor?.avatar_url && (
+                            <img
+                              src={item.doctor.avatar_url}
+                              alt={doctorName}
+                              className="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-slate-200"
+                            />
+                          )}
+                          <div>
+                            <div className="font-semibold text-blue-600">
+                              {doctorName}
+                            </div>
+                            <div className="text-xs text-slate-400">
+                              {item.doctor?.specialization || "General Practice"}
+                            </div>
+                          </div>
                         </div>
                       </td>
 

@@ -402,9 +402,17 @@ const Billing = () => {
                                         {/* Patient */}
                                         <td className="p-3.5">
                                             <div className="flex items-center gap-2.5">
-                                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center shrink-0">
-                                                    {initials(payment.patient?.first_name, payment.patient?.last_name)}
-                                                </div>
+                                                {payment.patient?.avatar_url ? (
+                                                    <img
+                                                        src={payment.patient.avatar_url}
+                                                        alt="Patient"
+                                                        className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-slate-200"
+                                                    />
+                                                ) : (
+                                                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center shrink-0">
+                                                        {initials(payment.patient?.first_name, payment.patient?.last_name)}
+                                                    </div>
+                                                )}
                                                 <span className="font-medium text-gray-900">
                                                     {payment.patient?.first_name} {payment.patient?.last_name}
                                                 </span>

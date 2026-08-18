@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   Bell,
@@ -10,12 +10,19 @@ import {
   MessageSquare,
   Moon,
   PackageX,
+  Pill,
   Search,
   Settings,
+  Stethoscope,
   Sun,
   UserRound,
+  Users,
+  X,
 } from "lucide-react";
 import { useTheme } from "../../../context/ThemeContext";
+import { useLocale } from "../../../context/LocaleContext";
+import LanguageSwitcher from "../../LanguageSwitcher";
+import api from "../../../services/api";
 
 // Fallback data so the panel has something to show out of the box. Pass a
 // real `notifications` prop from the parent once there's an API for it —
@@ -53,9 +60,18 @@ const NOTIF_ICONS = {
   message: { Icon: MessageSquare, className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400" },
 };
 
-function pageTitleFromPath(pathname) {
+const SEARCH_ICONS = {
+  patient: { Icon: Users, className: "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400" },
+  doctor: { Icon: Stethoscope, className: "bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400" },
+  medicine: { Icon: Pill, className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400" },
+  appointment: { Icon: CalendarClock, className: "bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400" },
+};
+
+function pageTitleFromPath(pathname, t) {
   const segment = pathname.split("/").filter(Boolean).pop();
-  if (!segment) return "Dashboard";
+  if (!segment) return t("page.dashboard");
+  const translated = t(`page.${segment}`);
+  if (translated !== `page.${segment}`) return translated;
   return segment
     .replace(/-/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -70,18 +86,92 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
   const [scrolled, setScrolled] = useState(false);
   const [notifList, setNotifList] = useState(notifications);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState({
+    patients: [],
+    doctors: [],
+    medicines: [],
+    appointments: [],
+  });
+
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
+  const searchRef = useRef(null);
   const cancelBtnRef = useRef(null);
+  const searchTimerRef = useRef(null);
 
   const themeState = useTheme();
   const theme = themeState?.theme || "light";
   const toggleTheme = themeState?.toggleTheme || (() => {});
 
+  const { t, localizedPath } = useLocale();
+  const navigate = useNavigate();
+
   const location = useLocation();
-  const pageTitle = pageTitleFromPath(location.pathname);
+  const pageTitle = pageTitleFromPath(location.pathname, t);
 
   const unreadCount = notifList.filter((n) => n.unread).length;
+
+  // Global search: query patients, doctors, medicines and appointments.
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+
+    const q = searchQuery.trim();
+
+    searchTimerRef.current = setTimeout(async () => {
+      if (q.length < 2) {
+        setSearchResults({ patients: [], doctors: [], medicines: [], appointments: [] });
+        setSearchLoading(false);
+        return;
+      }
+
+      setSearchLoading(true);
+      try {
+        const [patientsRes, doctorsRes, medicinesRes, appointmentsRes] = await Promise.allSettled([
+          api.get("/patients", { params: { search: q } }),
+          api.get("/doctors", { params: { search: q } }),
+          api.get("/medicines", { params: { search: q } }),
+          api.get("/appointments", { params: { search: q } }),
+        ]);
+
+        const extract = (res) =>
+          res.status === "fulfilled"
+            ? res.value?.data?.data?.data || res.value?.data?.data || res.value?.data || []
+            : [];
+
+        setSearchResults({
+          patients: extract(patientsRes),
+          doctors: extract(doctorsRes),
+          medicines: extract(medicinesRes),
+          appointments: extract(appointmentsRes),
+        });
+      } catch (error) {
+        console.error("Search failed:", error);
+        setSearchResults({ patients: [], doctors: [], medicines: [], appointments: [] });
+      } finally {
+        setSearchLoading(false);
+      }
+    }, q.length < 2 ? 0 : 350);
+
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [searchQuery]);
+
+  const totalResults =
+    searchResults.patients.length +
+    searchResults.doctors.length +
+    searchResults.medicines.length +
+    searchResults.appointments.length;
+
+  const goToSearchResult = (path, query) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    const target = localizedPath(query ? `${path}?search=${encodeURIComponent(query)}` : path);
+    navigate(target);
+  };
 
   // Close dropdowns on outside click.
   useEffect(() => {
@@ -91,6 +181,9 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
       }
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setNotifOpen(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setSearchOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -105,6 +198,7 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
       else {
         setMenuOpen(false);
         setNotifOpen(false);
+        setSearchOpen(false);
       }
     };
     document.addEventListener("keydown", handleEscape);
@@ -119,24 +213,23 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
   }, []);
 
   // Lock body scroll and animate the modal in while it's open.
- // Lock body scroll and animate the modal in while it's open.
-useEffect(() => {
-  if (showLogoutModal) {
-    document.body.style.overflow = "hidden";
-    const raf = requestAnimationFrame(() => setModalVisible(true));
-    const focusTimer = setTimeout(() => cancelBtnRef.current?.focus(), 50);
+  useEffect(() => {
+    if (showLogoutModal) {
+      document.body.style.overflow = "hidden";
+      const raf = requestAnimationFrame(() => setModalVisible(true));
+      const focusTimer = setTimeout(() => cancelBtnRef.current?.focus(), 50);
 
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(focusTimer);
-    };
-  } else {
-    document.body.style.overflow = "";
-    const raf = requestAnimationFrame(() => setModalVisible(false));
+      return () => {
+        cancelAnimationFrame(raf);
+        clearTimeout(focusTimer);
+      };
+    } else {
+      document.body.style.overflow = "";
+      const raf = requestAnimationFrame(() => setModalVisible(false));
 
-    return () => cancelAnimationFrame(raf);
-  }
-}, [showLogoutModal]);
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [showLogoutModal]);
 
   const initials = (user?.name || title)
     .split(" ")
@@ -148,8 +241,6 @@ useEffect(() => {
   const avatarSrc =
     user?.avatar_url || user?.avatar || user?.profile_picture || user?.image || "";
 
-  // Track which src failed to load so a newly uploaded picture renders even
-  // after a previous one errored out.
   const avatarVisible = Boolean(avatarSrc) && avatarErrorSrc !== avatarSrc;
 
   const handleOpenLogoutModal = () => {
@@ -163,6 +254,53 @@ useEffect(() => {
   };
 
   const markAllRead = () => setNotifList((list) => list.map((n) => ({ ...n, unread: false })));
+
+  const searchGroups = [
+    {
+      key: "patients",
+      label: t("navbar.searchPatients"),
+      to: "/patients",
+      items: searchResults.patients.map((p) => ({
+        id: p.id,
+        label: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.name || "Patient",
+        sub: p.patient_code || p.phone || "",
+        avatar: p.avatar_url,
+      })),
+    },
+    {
+      key: "doctors",
+      label: t("navbar.searchDoctors"),
+      to: "/doctors",
+      items: searchResults.doctors.map((d) => ({
+        id: d.id,
+        label: d.user?.name || d.name || d.full_name || "Doctor",
+        sub: d.specialization || d.speciality || "",
+        avatar: d.avatar_url,
+      })),
+    },
+    {
+      key: "medicines",
+      label: t("navbar.searchMedicines"),
+      to: "/medicines",
+      items: searchResults.medicines.map((m) => ({
+        id: m.id,
+        label: m.name || "Medicine",
+        sub: m.category || "",
+        avatar: null,
+      })),
+    },
+    {
+      key: "appointments",
+      label: t("navbar.searchAppointments"),
+      to: "/appointments",
+      items: searchResults.appointments.map((a) => ({
+        id: a.id,
+        label: `${a.patient?.first_name || ""} ${a.patient?.last_name || ""}`.trim() || "Appointment",
+        sub: `${a.appointment_date || ""} ${a.appointment_time ? `· ${a.appointment_time.substring(0, 5)}` : ""}`.trim(),
+        avatar: a.patient?.avatar_url,
+      })),
+    },
+  ].filter((group) => group.items.length > 0);
 
   return (
     <>
@@ -187,27 +325,108 @@ useEffect(() => {
           </div>
 
           {/* Search Bar */}
-          <div className="relative max-w-xs flex-1 sm:max-w-sm">
+          <div className="relative max-w-xs flex-1 sm:max-w-sm" ref={searchRef}>
             <Search
               size={18}
               className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors"
             />
             <input
               type="text"
-              placeholder="Search anything..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSearchOpen(true);
+              }}
+              onFocus={() => setSearchOpen(true)}
+              placeholder={t("navbar.searchPlaceholder")}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700/80 dark:bg-slate-800/50 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-blue-500 dark:focus:bg-slate-800"
             />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setSearchOpen(false);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
+                aria-label="Clear search"
+              >
+                <X size={14} />
+              </button>
+            )}
+
+            {searchOpen && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                <div className="max-h-96 overflow-y-auto p-1.5">
+                  {searchLoading && searchQuery.trim().length >= 2 ? (
+                    <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-400">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+                      {t("common.loading")}
+                    </div>
+                  ) : !searchQuery.trim() || searchQuery.trim().length < 2 ? (
+                    <p className="px-4 py-8 text-center text-sm text-slate-400">
+                      {t("common.search")}…
+                    </p>
+                  ) : totalResults === 0 ? (
+                    <p className="px-4 py-8 text-center text-sm text-slate-400">
+                      {t("navbar.noResults", { query: searchQuery })}
+                    </p>
+                  ) : (
+                    searchGroups.map((group) => {
+                      const { Icon, className } = SEARCH_ICONS[group.key];
+                      return (
+                        <div key={group.key} className="mb-1 last:mb-0">
+                          <p className="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                            <Icon size={12} className={className} />
+                            {group.label}
+                          </p>
+                          {group.items.slice(0, 5).map((item) => (
+                            <button
+                              key={item.id}
+                              onClick={() => goToSearchResult(group.to, searchQuery)}
+                              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/70"
+                            >
+                              {item.avatar ? (
+                                <img
+                                  src={item.avatar}
+                                  alt={item.label}
+                                  className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+                                />
+                              ) : (
+                                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${className}`}>
+                                  <Icon size={15} />
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                  {item.label}
+                                </p>
+                                {item.sub && (
+                                  <p className="truncate text-xs text-slate-400">{item.sub}</p>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Action Icons & User Menu */}
           <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
+
+            {/* Language toggle */}
+            <LanguageSwitcher />
 
             {/* Notifications */}
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifOpen((open) => !open)}
                 className="relative rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 active:scale-95 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                title="Notifications"
+                title={t("navbar.notifications")}
                 aria-expanded={notifOpen}
               >
                 <Bell size={19} />
@@ -222,20 +441,20 @@ useEffect(() => {
               {notifOpen && (
                 <div className="absolute right-0 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Notifications</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("navbar.notifications")}</p>
                     {unreadCount > 0 && (
                       <button
                         onClick={markAllRead}
                         className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
                       >
-                        Mark all as read
+                        {t("navbar.markAllRead")}
                       </button>
                     )}
                   </div>
 
                   <div className="max-h-80 overflow-y-auto">
                     {notifList.length === 0 ? (
-                      <p className="px-4 py-8 text-center text-sm text-slate-400">You're all caught up.</p>
+                      <p className="px-4 py-8 text-center text-sm text-slate-400">{t("navbar.allCaughtUp")}</p>
                     ) : (
                       notifList.map((n) => {
                         const { Icon, className } = NOTIF_ICONS[n.type] || NOTIF_ICONS.message;
@@ -270,7 +489,7 @@ useEffect(() => {
             <button
               onClick={toggleTheme}
               className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-100 active:scale-95 dark:border-slate-700/80 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800"
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              title={theme === "dark" ? t("navbar.switchLight") : t("navbar.switchDark")}
             >
               {theme === "dark" ? (
                 <Sun size={16} className="text-amber-400" />
@@ -334,21 +553,21 @@ useEffect(() => {
 
                   <div className="py-1">
                     <Link
-                      to="/profile"
+                      to={localizedPath("/profile")}
                       onClick={() => setMenuOpen(false)}
                       className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                     >
                       <UserRound size={16} className="text-slate-400" />
-                      Profile
+                      {t("nav.profile")}
                     </Link>
 
                     <Link
-                      to="/settings"
+                      to={localizedPath("/settings")}
                       onClick={() => setMenuOpen(false)}
                       className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                     >
                       <Settings size={16} className="text-slate-400" />
-                      Settings
+                      {t("nav.settings")}
                     </Link>
                   </div>
 
@@ -358,7 +577,7 @@ useEffect(() => {
                       className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
                     >
                       <LogOut size={16} />
-                      Logout
+                      {t("nav.signOut")}
                     </button>
                   </div>
                 </div>
@@ -394,10 +613,10 @@ useEffect(() => {
             {/* Text Context */}
             <div className="mt-5 text-center">
               <h3 id="logout-modal-title" className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                Sign out of your account?
+                {t("logout.title")}
               </h3>
               <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                You will need to re-enter your credentials to access your dashboard and patient records.
+                {t("logout.message")}
               </p>
 
               {/* Who's signing out, for extra confidence on shared workstations */}
@@ -422,7 +641,7 @@ useEffect(() => {
                 onClick={handleConfirmLogout}
                 className="w-full rounded-xl bg-red-600 py-2.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-red-700 active:scale-[0.98] dark:bg-red-600 dark:hover:bg-red-500"
               >
-                Yes, Log Out
+                {t("logout.confirm")}
               </button>
               <button
                 ref={cancelBtnRef}
@@ -430,7 +649,7 @@ useEffect(() => {
                 onClick={() => setShowLogoutModal(false)}
                 className="w-full rounded-xl bg-slate-100 py-2.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-200 active:scale-[0.98] dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               >
-                Cancel
+                {t("logout.cancel")}
               </button>
             </div>
           </div>

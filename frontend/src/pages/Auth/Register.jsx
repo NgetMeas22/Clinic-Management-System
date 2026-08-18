@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useLocale } from "../../context/LocaleContext";
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -17,6 +18,7 @@ export default function Register() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { register } = useAuth?.() || {};
+  const { localizedPath } = useLocale();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -49,7 +51,7 @@ export default function Register() {
       } else {
         console.log("Form Submitted:", formData);
       }
-      navigate("/login");
+      navigate(localizedPath("/login"));
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -282,7 +284,7 @@ export default function Register() {
           <div className="pt-3 mt-4 border-t border-slate-100 text-center">
             <p className="text-xs text-slate-500">
               Already have an account?{" "}
-              <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700">
+              <Link to={localizedPath("/login")} className="font-semibold text-blue-600 hover:text-blue-700">
                 Sign In
               </Link>
             </p>

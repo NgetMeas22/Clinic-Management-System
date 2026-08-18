@@ -24,53 +24,54 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
+import { useLocale } from "../../../context/LocaleContext";
 import { canVisit } from "../../../utils/permissions";
 
 // Nav items are grouped so the sidebar reads as sections of the clinic
 // workflow rather than one long flat list.
-const NAV_GROUPS = [
+const NAV_GROUPS = (t) => [
   {
-    label: "Overview",
-    items: [{ name: "Dashboard", icon: LayoutGrid, to: "/dashboard" }],
+    label: t("nav.overview"),
+    items: [{ name: t("nav.dashboard"), icon: LayoutGrid, to: "/dashboard" }],
   },
   {
-    label: "Facility",
+    label: t("nav.facility"),
     items: [
-      { name: "Departments", icon: Building2, to: "/departments" },
-      { name: "Doctors", icon: Stethoscope, to: "/doctors" },
-      { name: "Users", icon: UserCog, to: "/users" },
+      { name: t("nav.departments"), icon: Building2, to: "/departments" },
+      { name: t("nav.doctors"), icon: Stethoscope, to: "/doctors" },
+      { name: t("nav.users"), icon: UserCog, to: "/users" },
     ],
   },
   {
-    label: "Patient Care",
+    label: t("nav.patientCare"),
     items: [
-      { name: "Patients", icon: Users, to: "/patients" },
-      { name: "Appointments", icon: Calendar, to: "/appointments" },
-      { name: "Medical Records", icon: FileText, to: "/medical-records" },
-      { name: "Prescriptions", icon: ShieldCheck, to: "/prescriptions" },
+      { name: t("nav.patients"), icon: Users, to: "/patients" },
+      { name: t("nav.appointments"), icon: Calendar, to: "/appointments" },
+      { name: t("nav.medicalRecords"), icon: FileText, to: "/medical-records" },
+      { name: t("nav.prescriptions"), icon: ShieldCheck, to: "/prescriptions" },
     ],
   },
   {
-    label: "Pharmacy",
+    label: t("nav.pharmacy"),
     items: [
-      { name: "Medicines", icon: Pill, to: "/medicines" },
-      { name: "Inventory", icon: BriefcaseMedical, to: "/inventory" },
+      { name: t("nav.medicines"), icon: Pill, to: "/medicines" },
+      { name: t("nav.inventory"), icon: BriefcaseMedical, to: "/inventory" },
     ],
   },
   {
-    label: "Finance",
+    label: t("nav.finance"),
     items: [
-      { name: "Payments", icon: Banknote, to: "/payments" },
-      { name: "Billing", icon: Banknote, to: "/billing" },
-      { name: "Reports", icon: FileText, to: "/reports" },
+      { name: t("nav.payments"), icon: Banknote, to: "/payments" },
+      { name: t("nav.billing"), icon: Banknote, to: "/billing" },
+      { name: t("nav.reports"), icon: FileText, to: "/reports" },
     ],
   },
 ];
 
-const BOTTOM_NAV_ITEMS = [
-  { name: "Profile", icon: UserRound, to: "/profile" },
-  { name: "Settings", icon: Settings, to: "/settings" },
-  { name: "Support", icon: HelpCircle, to: "/support" },
+const BOTTOM_NAV_ITEMS = (t) => [
+  { name: t("nav.profile"), icon: UserRound, to: "/profile" },
+  { name: t("nav.settings"), icon: Settings, to: "/settings" },
+  { name: t("nav.support"), icon: HelpCircle, to: "/support" },
 ];
 
 function initialsOf(name = "") {
@@ -91,6 +92,7 @@ export default function Sidebar({ onCollapseChange }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [avatarErrorSrc, setAvatarErrorSrc] = useState(null);
   const { user, logout } = useAuth();
+  const { t, localizedPath } = useLocale();
   const userMenuRef = useRef(null);
 
   const avatarSrc =
@@ -99,15 +101,15 @@ export default function Sidebar({ onCollapseChange }) {
   const avatarVisible = Boolean(avatarSrc) && avatarErrorSrc !== avatarSrc;
 
   const visibleGroups = useMemo(() => {
-    return NAV_GROUPS.map((group) => ({
+    return NAV_GROUPS(t).map((group) => ({
       ...group,
       items: group.items.filter((item) => canVisit(user, item.to)),
     })).filter((group) => group.items.length > 0);
-  }, [user]);
+  }, [user, t]);
 
   const visibleBottomItems = useMemo(
-    () => BOTTOM_NAV_ITEMS.filter((item) => canVisit(user, item.to)),
-    [user]
+    () => BOTTOM_NAV_ITEMS(t).filter((item) => canVisit(user, item.to)),
+    [user, t]
   );
 
   useEffect(() => {
@@ -164,7 +166,7 @@ export default function Sidebar({ onCollapseChange }) {
     const Icon = item.icon;
     return (
       <NavLink
-        to={item.to}
+        to={localizedPath(item.to)}
         onClick={() => setIsOpen(false)}
         className={linkClass}
         title={collapsed ? item.name : undefined}
@@ -195,7 +197,7 @@ export default function Sidebar({ onCollapseChange }) {
         className={`fixed top-4 z-50 rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-md transition-transform active:scale-95 lg:hidden dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 ${
           isOpen ? "right-4" : "left-4"
         }`}
-        aria-label="Toggle navigation"
+        aria-label={t("nav.toggleNav")}
         aria-expanded={isOpen}
       >
         {isOpen ? <X size={22} /> : <Menu size={22} />}
@@ -217,7 +219,7 @@ export default function Sidebar({ onCollapseChange }) {
           {/* Brand */}
           <div className={`flex items-center gap-2 px-4 pb-4 pt-6 ${collapsed ? "flex-col justify-center" : "justify-between"}`}>
             <Link
-              to="/dashboard"
+              to={localizedPath("/dashboard")}
               onClick={() => setIsOpen(false)}
               className={`flex min-w-0 items-center gap-3 ${collapsed ? "justify-center" : ""}`}
             >
@@ -258,7 +260,7 @@ export default function Sidebar({ onCollapseChange }) {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   type="text"
-                  placeholder="Search menu"
+                  placeholder={t("nav.searchMenu")}
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:focus:bg-slate-900"
                 />
               </div>
@@ -270,7 +272,7 @@ export default function Sidebar({ onCollapseChange }) {
             {searchResults ? (
               <div className="space-y-1">
                 {searchResults.length === 0 ? (
-                  <p className="px-3 py-4 text-center text-sm text-slate-400">No matches for “{query}”</p>
+                  <p className="px-3 py-4 text-center text-sm text-slate-400">{t("nav.noMatches", { query })}</p>
                 ) : (
                   searchResults.map((item) => <NavItem key={item.to} item={item} />)
                 )}
@@ -343,21 +345,21 @@ export default function Sidebar({ onCollapseChange }) {
             {userMenuOpen && !collapsed && (
               <div className="absolute bottom-full left-0 mb-2 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
                 <Link
-                  to="/profile"
+                  to={localizedPath("/profile")}
                   onClick={() => {
                     setUserMenuOpen(false);
                     setIsOpen(false);
                   }}
                   className="block px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
-                  View profile
+                  {t("nav.viewProfile")}
                 </Link>
                 <button
                   onClick={handleSignOut}
                   className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
                 >
                   <LogOut size={15} />
-                  Sign out
+                  {t("nav.signOut")}
                 </button>
               </div>
             )}

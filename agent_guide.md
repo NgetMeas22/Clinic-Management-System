@@ -9,7 +9,10 @@ A practical guide for AI agents working on this repository. Read this before mak
 A clinic/hospital management web app (CRUD + business workflow) built as a monorepo with a
 **Laravel 10 REST API backend** and a **React (Vite) SPA frontend**. It tracks patients, doctors,
 departments, appointments, medical records, prescriptions, medicines (inventory), and payments,
-with role-based access for **Admin**, **Doctor**, and **Receptionist**.
+with role-based access for **Admin**, **Doctor**, and **Receptionist**. Brand: **NGM Clinic**.
+
+The UI is bilingual **Khmer (default) / English** — routes, navigation, and labels are localized
+(see §7 "i18n & locale").
 
 Development environment is Windows + **Laragon** + **MySQL** (managed via HeidiSQL).
 
@@ -22,7 +25,7 @@ Development environment is Windows + **Laragon** + **MySQL** (managed via HeidiS
 | Backend   | PHP ^8.1, Laravel ^10.10, Laravel Sanctum ^3.3          |
 | Database  | MySQL (`clinic_management`, utf8mb4_unicode_ci)         |
 | Frontend  | React 19, Vite 8, Tailwind CSS 4, react-router-dom 7    |
-| Frontend libs | axios, recharts (charts), lucide-react (icons)     |
+| Frontend libs | axios, recharts (charts), lucide-react (icons)      |
 | Tooling   | Composer, npm, PHPUnit (backend), ESLint (frontend)     |
 
 There are NO TypeScript, Redux, or zod usages in `src` despite them being present in
@@ -34,7 +37,7 @@ There are NO TypeScript, Redux, or zod usages in `src` despite them being presen
 
 ```
 React SPA (Vite, port 5173)
-      │  axios, Bearer token, JSON
+      │  axios, Bearer token, JSON, Accept-Language header
       ▼
 Laravel API (http://127.0.0.1:8000/api)  ← Sanctum auth + RoleMiddleware
       │  Eloquent ORM
@@ -42,13 +45,16 @@ Laravel API (http://127.0.0.1:8000/api)  ← Sanctum auth + RoleMiddleware
 MySQL database `clinic_management`
 ```
 
-- Frontend talks to backend at **`http://127.0.0.1:8000/api`** (hardcoded in
-  `frontend/src/services/api.js` and `frontend/src/context/AuthContext.jsx`).
+- Frontend talks to backend at **`http://127.0.0.1:8000/api`**. This is centralized in
+  `frontend/src/api/axios.js` (the shared axios instance, re-exported by
+  `frontend/src/services/api.js`). `AuthContext.jsx` ALSO sets `axios.defaults.baseURL` to the
+  same value — keep both in sync.
 - Auth is token-based: `POST /api/login` returns `access_token`; the token is stored in
-  `localStorage` key `token` and attached as `Authorization: Bearer <token>` via an axios
-  interceptor.
-- 401 responses clear the token and redirect to `/login`; 403 dispatches an
-  `api-forbidden` window event.
+  `localStorage` key `token` and attached as `Authorization: Bearer <token>` by the axios
+  request interceptor in `src/api/axios.js`.
+- The request interceptor also sends `Accept-Language: km|en` (derived from the URL path).
+- 401 responses clear the token and hard-redirect to `/login` (or `/en/login`); 403 dispatches
+  an `api-forbidden` window event.
 
 ### Directory layout
 
@@ -58,27 +64,32 @@ clinic-management-system/
 │   ├── app/Http/Controllers/Api/   # AuthController, DashboardController, DepartmentController,
 │   │                               # DoctorController, PatientController, MedicalRecordController,
 │   │                               # MedicineController, PrescriptionController, PaymentController,
-│   │                               # ReportController
+│   │                               # ReportController, UserController
 │   ├── app/Http/Controllers/AppointmentController.php   # (top-level, imported specially in routes)
 │   ├── app/Http/Middleware/RoleMiddleware.php           # registered as `role`
 │   ├── app/Models/          # User, Role, Department, Doctor, Patient, Appointment,
-│   │                        # MedicalRecord, Medicine, Prescription, PrescriptionItem, Payment
-│   ├── database/migrations/ # 12 domain tables + 1 alter (doctor status enum)
-│   ├── database/seeders/DatabaseSeeder.php   # roles + 3 users + 1 patient
+│   │                        # MedicalRecord, Medicine (SoftDeletes), Prescription,
+│   │                        # PrescriptionItem, Payment
+│   ├── database/migrations/ # 11 domain tables + 5 alter migrations (see §5)
+│   ├── database/seeders/DatabaseSeeder.php   # roles + 3 users + doctor + 15 depts + 8 meds
 │   └── routes/api.php       # ALL API routes
 ├── frontend/           # React SPA
 │   └── src/
-│       ├── App.jsx                 # route table
-│       ├── components/             # ProtectedRoute, AppointmentForm/Modal/Table, PrescriptionFormModal
+│       ├── App.jsx                 # renders <AppRoutes /> (no routes defined here anymore)
+│       ├── routes/AppRoutes.jsx    # route table + role-guarded route groups (see §7)
+│       ├── api/axios.js            # single shared axios instance (baseURL, interceptors)
+│       ├── components/             # ProtectedRoute, LanguageSwitcher, AppointmentModal/Form/Table,
+│       │   │                       # PrescriptionFormModal
 │       │   └── common/layout/      # Navbar.jsx, Sidebar.jsx, Footer.jsx
-│       ├── context/                # AuthContext.jsx, ThemeContext.jsx
-│       ├── layouts/                # AdminLayout, DoctorLayout, RoleRoute
-│       ├── pages/                  # one file per feature (see below)
+│       ├── context/                # AuthContext.jsx, ThemeContext.jsx, LocaleContext.jsx
+│       ├── i18n/translations.js    # km + en label strings (see §7)
+│       ├── layouts/                # AdminLayout/DoctorLayout/RoleRoute — DEAD CODE, no longer imported
+│       ├── pages/                  # one file per feature (see §7)
 │       ├── services/               # axios wrappers per resource
-│       └── utils/permissions.js    # role/permission helpers
+│       └── utils/                  # permissions.js, localizedPath.js
 ├── plan.txt             # original 10-day dev plan (historical; does not match final code exactly)
 ├── Structure.txt        # planned file tree (partially outdated)
-├── Database.txt         # full SQL schema reference
+├── Database.txt         # full SQL schema reference (does NOT include the new alter migrations)
 └── Architecture         # ASCII architecture + role permission overview
 ```
 
@@ -93,56 +104,75 @@ Role checking is **case-insensitive** (`RoleMiddleware` lowercases both sides).
 
 | Resource | view (index/show) | write | delete |
 |---|---|---|---|
-| departments | Admin, Receptionist | Admin | Admin |
+| departments | Admin, Doctor, Receptionist | Admin | Admin |
 | doctors | Admin, Doctor, Receptionist | Admin | Admin |
 | patients | Admin, Doctor, Receptionist | Admin, Receptionist | Admin |
-| appointments | Admin, Doctor, Receptionist | Admin, Receptionist | Admin |
+| appointments | Admin, Doctor, Receptionist | store: Admin, Receptionist; update: Admin, Doctor, Receptionist | Admin |
 | medical-records | Admin, Doctor | Admin, Doctor | Admin |
 | prescriptions | Admin, Doctor | Admin, Doctor | Admin |
 | medicines | Admin, Doctor, Receptionist | Admin | Admin |
 | payments | Admin, Receptionist | Admin, Receptionist | Admin |
+| users | Admin | Admin | Admin |
 | reports | — | — | Admin only |
 
 Dashboard + `/me`, `/profile`, `/password`, `/logout` are available to all three roles.
 
-### Frontend (enforced in `src/utils/permissions.js` + route guards in `App.jsx`)
+Doctor-specific scoping: in `AppointmentController`, `MedicalRecordController`, and
+`PrescriptionController`, a Doctor user only sees rows where `doctor_id` = their linked Doctor
+record. A Doctor whose `users` row has no `doctors` row gets an empty paginated list (the
+`where('id', 0)` trick), not a 403.
+
+### Frontend (enforced in `src/utils/permissions.js` + route groups in `src/routes/AppRoutes.jsx`)
 
 - `ROLES`, `routeRoles`, `actions`, `can(user, resource, action)`, `canVisit(user, path)`.
-- Route groups in `App.jsx`:
-  - All roles: `/dashboard`, `/appointments`, `/doctors`, `/patients`, `/medicines`
-    (+ alias `/inventory`), `/profile`, `/settings`, `/support`
+- Route groups in `AppRoutes.jsx` (`APP_ROUTES` array):
+  - All roles: `/dashboard`, `/appointments`, `/doctors`, `/patients`, `/medicines`,
+    `/inventory`, `/profile`, `/settings`, `/support`
   - Admin + Doctor: `/medical-records`, `/prescriptions`
-  - Admin + Receptionist: `/departments`, `/payments` (+ alias `/billing`)
+  - Admin + Receptionist: `/departments`, `/payments`, `/billing`
   - Admin only: `/reports`, `/users`
-  - `/403` → `Unauthorized` page
+  - `/403` → `Unauthorized` page; unknown paths redirect to `/dashboard`
 - Sidebar menu visibility is driven by role too (see `common/layout/Sidebar.jsx`).
+- **Keep backend + frontend permission tables in sync.** If you change one, update the other.
 
 ---
 
 ## 5. Database schema (summary)
 
-Full SQL: `Database.txt`. Tables:
+Full SQL: `Database.txt` — but note it only reflects the *original* `CREATE TABLE` statements.
+The running schema also includes the newer **alter migrations** listed below.
+
+Tables (11 domain tables):
 
 1. **roles** — id, name (unique), description
-2. **users** — role_id FK→roles, name, email (unique), password, phone, status
-   (active/inactive)
+2. **users** — role_id FK→roles, name, email (unique), password, phone, **profile_picture**,
+   status (active/inactive)
 3. **departments** — name (unique), description, status
 4. **doctors** — user_id (unique FK→users, cascade), department_id FK→departments,
-   specialization, license_number (unique), gender, date_of_birth, address, **status
-   (active/inactive/on_leave — extended by migration `2026_08_12_014437`)**
+   specialization, license_number (unique), gender, date_of_birth, address, **profile_picture**,
+   **status (active/inactive/on_leave)**
 5. **patients** — patient_code (unique, e.g. `P1001`), first_name, last_name, gender,
-   date_of_birth, blood_group, phone, email, address, emergency_contact, emergency_phone, status
+   date_of_birth, blood_group, phone, email, **profile_picture**, address, emergency_contact,
+   emergency_phone, status
 6. **appointments** — patient_id, doctor_id, appointment_date, appointment_time, reason,
    status (pending/confirmed/completed/cancelled), notes
 7. **medical_records** — patient_id, doctor_id, appointment_id (unique), symptoms, diagnosis,
    treatment, notes
 8. **medicines** — name, category, description, quantity (unsigned), unit, price
-   (DECIMAL 10,2), expiry_date, status
+   (DECIMAL 10,2), expiry_date, status, **deleted_at (soft deletes)**
 9. **prescriptions** — patient_id, doctor_id, medical_record_id, prescription_date, notes
 10. **prescription_items** — prescription_id (cascade), medicine_id, quantity, dosage,
     frequency, duration, instruction
 11. **payments** — patient_id, appointment_id, amount, payment_method (cash/aba/card),
     payment_status (pending/paid/cancelled), transaction_code (unique), payment_date, notes
+
+### Alter migrations (run on top of the base schema)
+
+- `2026_08_12_014437` — extend doctors.status enum with `on_leave` (raw `DB::statement`).
+- `2026_08_17_000000` — add `users.profile_picture` (nullable string).
+- `2026_08_17_010000` — add `medicines.deleted_at` (soft deletes).
+- `2026_08_18_000000` — add `doctors.profile_picture` (nullable string).
+- `2026_08_18_010000` — add `patients.profile_picture` (nullable string).
 
 Key relationships (Eloquent):
 - User 1—1 Doctor; User N—1 Role
@@ -150,11 +180,23 @@ Key relationships (Eloquent):
 - Patient 1—N Appointment / MedicalRecord / Prescription / Payment
 - Appointment 1—1 MedicalRecord; 1—N Payment
 - MedicalRecord 1—N Prescription; Prescription 1—N PrescriptionItem N—1 Medicine
+- `User` model has an `avatar_url` accessor → `asset('storage/'.$profile_picture)`.
+- `Medicine` uses the `SoftDeletes` trait.
 
-`DatabaseSeeder` creates the 3 roles and these login accounts (password = `password`):
-- `admin@clinic.com`
-- `doctor@clinic.com`
-- `receptionist@clinic.com`
+### Seeded data (`DatabaseSeeder`)
+
+- Roles: Admin, Doctor, Receptionist (`firstOrCreate`).
+- Users (`updateOrCreate` by email, **passwords are NOT `password`**):
+
+| Email                    | Password          | Role        |
+|--------------------------|-------------------|-------------|
+| `admin@clinic.com`       | `admin12345`      | Admin       |
+| `doctor@clinic.com`      | `doctor12345`     | Doctor      |
+| `receptionist@clinic.com`| `receptionist12345`| Receptionist|
+
+- One Doctor profile linked to `doctor@clinic.com` (General Medicine, license `LIC-SEED-001`).
+- 15 departments (`seedDepartments()`), 8 medicines (`seedMedicines()`, e.g. Paracetamol 500mg).
+- No patients are seeded (the patient seed is commented out).
 
 ---
 
@@ -167,9 +209,10 @@ Authenticated (`auth:sanctum`):
 - `GET /api/dashboard`, `/api/dashboard/weekly`, `/api/dashboard/daily-this-month`,
   `/api/dashboard/monthly`
 - RESTful: `departments`, `doctors`, `patients`, `appointments`, `medical-records`,
-  `prescriptions`, `medicines`, `payments` (per-resource role rules above)
+  `prescriptions`, `medicines`, `payments` (per-resource role rules in §4)
 
 Admin-only:
+- `apiResource('users')` → `GET/POST/PUT/DELETE /api/users` (full CRUD via `UserController`)
 - `GET /api/reports/patients`, `/api/reports/doctors`, `/api/reports/appointments`,
   `/api/reports/payments`, `/api/reports/medicines`
 
@@ -178,36 +221,70 @@ Notes / gotchas:
   (top-level), while all other controllers are under `App\Http\Controllers\Api\`. Keep imports
   in `routes/api.php` consistent with this.
 - Response shapes are hand-rolled (not API Resources). Login/me return
-  `{ user: { id, name, email, phone, role } }` and login also returns `access_token`.
-  List endpoints generally return paginated/plain arrays — inspect the controller before
-  assuming a shape.
+  `{ user: { id, name, email, phone, avatar_url, profile_picture, role } }`; login also returns
+  `access_token`. Some controllers wrap in `{ success, message, data }` (e.g. `UserController`,
+  list endpoints), others return bare arrays/shapes — **inspect the controller before assuming
+  a shape**.
+- `login` returns **403 "account is currently inactive"** for `status !== 'active'` users.
+- `PUT /api/profile` accepts a `profile_picture` file (jpg/jpeg/png/webp, ≤2MB); the file is
+  stored to `storage/app/public/profile-pictures` and the old file is deleted on replace.
 - Only `StorePatientRequest` exists; other controllers validate inline with
   `$request->validate(...)`.
+- Deleting a Doctor or User is blocked (422) if the linked doctor has appointments/medical
+  records/prescriptions — the UI should soft-deactivate instead.
+- `DoctorController::update` can re-attach an **orphaned** doctor row (its `user_id` was deleted)
+  by creating a fresh `User` (default password `doctor7777`).
 
 ---
 
 ## 7. Frontend structure
 
-### Pages (`src/pages/`)
-`Dashboard`, `Appointments`, `Doctor`, `Patients`, `MedicalRecord`, `Prescription`,
-`Department`, `Medicine`, `Payment`, `Reports`, `User`, `Profile`, `Settings`, `Support`,
-`Unauthorized`, plus `Auth/Login` and `Auth/Register`.
+### Routing & layout
 
-Aliases: `/inventory` renders `Medicine`; `/billing` renders `Payment`.
+- `src/App.jsx` is a thin wrapper around `src/routes/AppRoutes.jsx`.
+- `AppRoutes.jsx` defines the `APP_ROUTES` array (path → component → allowed roles), groups
+  them by role set, and renders each group under `ProtectedRoute` + a shared `DashboardShell`
+  (collapsible `Sidebar` + `Navbar` + `<Outlet />`).
+- `src/layouts/` (`AdminLayout`, `DoctorLayout`, `RoleRoute`) is **dead code** — nothing imports
+  it. Don't resurrect it; use the `AppRoutes.jsx` pattern.
+
+### Pages (`src/pages/`)
+
+`Dashboard`, `Appointments`, `Doctor`, `Patients`, `MedicalRecord`, `Prescription`,
+`Department`, `Medicine`, `Payment`, **`Inventory`**, **`Billing`**, `Reports`, `User`,
+`Profile`, `Settings`, `Support`, `Unauthorized`, plus `Auth/Login`, `Auth/Register`, and
+`Auth/Doctor.jsx` (a stray re-export of the `Doctor` page — leave alone unless asked).
+
+Note: `/inventory` and `/billing` are now **full standalone pages** (`Inventory.jsx`,
+`Billing.jsx`) — they no longer simply re-render `Medicine`/`Payment`.
+
+### i18n & locale
+
+- `src/context/LocaleContext.jsx` provides `{ locale, t, setLocale, localizedPath }`.
+- Two locales: **`km` (default, no URL prefix)** and **`en` (`/en` URL prefix)**. Detection and
+  path rewriting live in `src/utils/localizedPath.js`.
+- All UI strings come from `src/i18n/translations.js` — **when you add UI text, add it for BOTH
+  `km` and `en`** and render via `t("key", { vars })` (see `LanguageSwitcher.jsx` in the Navbar).
+- `ProtectedRoute`, login redirects, and the axios interceptor all respect the locale prefix.
 
 ### Services (`src/services/`)
-`api.js` (shared axios instance) + `appointmentService`, `dashboardService`,
-`doctorService`, `medicalRecordService`, `medicineService`, `patientService`,
-`paymentService`, `prescriptionService`, `reportService`. New API calls should go through
-`api.js` (or a resource service importing it) so auth headers/401 handling apply.
+
+`api.js` (re-exports the shared instance from `src/api/axios.js`) + `appointmentService`,
+`dashboardService`, `doctorService`, `medicalRecordService`, `medicineService`,
+`patientService`, `paymentService`, `prescriptionService`, `reportService`, `userService`.
+New API calls should go through `api.js` (or a resource service importing it) so auth
+headers/401/403 handling apply.
 
 ### State
+
 - `AuthContext` provides `{ user, token, login, logout, loading, updateProfile,
-  changePassword }`. `useAuth()` hook reads it.
+  changePassword }`. `updateProfile` supports both plain JSON and `FormData` (for
+  `profile_picture` uploads, sent as a `POST` with `_method: PUT`).
 - `ThemeContext` handles dark/light mode (Tailwind `dark:` classes).
-- No Redux / react-query — keep using context + local state.
+- `LocaleContext` handles language. No Redux / react-query — keep using context + local state.
 
 ### Styling
+
 Tailwind CSS v4 (utility classes in JSX). Support dark mode via `dark:` variants. Reuse
 existing components (modal/table/form patterns in `components/`) instead of inventing new
 ones.
@@ -222,7 +299,8 @@ cd backend
 composer install
 copy .env.example .env          # set DB_DATABASE=clinic_management, DB_USERNAME=root, DB_PASSWORD=
 php artisan key:generate
-php artisan migrate --seed      # build schema + seed roles/users/patient
+php artisan migrate --seed      # build schema + seed roles/users/departments/medicines
+php artisan storage:link        # needed so profile pictures (storage/profile-pictures) are served
 php artisan serve               # or run via Laragon
 ```
 
@@ -247,16 +325,19 @@ npm run lint                    # ESLint
 3. **Auth is Sanctum + Bearer.** Never weaken `auth:sanctum` / `role:` middleware when
    touching routes. Keep the `role` route middleware registered in `Http/Kernel.php`.
 4. **Frontend route guards mirror backend roles.** If you change backend permissions, update
-   `src/utils/permissions.js` and `App.jsx` route groups to match.
-5. **Don't commit secrets.** `.env` files and `node_modules`/`vendor` are git-ignored; keep it
+   `src/utils/permissions.js` and the `APP_ROUTES` groups in `src/routes/AppRoutes.jsx` to match.
+5. **New UI text must be localized.** Add `km` AND `en` keys to `src/i18n/translations.js` and
+   render through `useLocale().t(...)`; don't hardcode visible labels in JSX.
+6. **Don't commit secrets.** `.env` files and `node_modules`/`vendor` are git-ignored; keep it
    that way. Never write real credentials into code or docs.
-6. **Don't add code comments unless asked.** Keep the codebase's current minimal-comment style.
-7. **Verify work.** Backend: `php artisan test` (PHPUnit) or manual Postman-style curl;
+7. **Don't add code comments unless asked.** Keep the codebase's current minimal-comment style.
+8. **Verify work.** Backend: `php artisan test` (PHPUnit) or manual Postman-style curl;
    frontend: `npm run build` / `npm run lint`. There are currently no dedicated test suites
    for the app domain beyond Laravel's `ExampleTest` stubs.
-8. **Docs files `plan.txt`/`Structure.txt` are historical.** Trust the code, not the docs,
-   when they disagree (e.g., actual controllers live under `Api\`, frontend has flat page
-   files, doctor status includes `on_leave`).
+9. **Docs files `plan.txt`/`Structure.txt`/`Database.txt` are historical.** Trust the code, not
+   the docs, when they disagree (e.g., `Database.txt` predates the alter migrations; `Structure.txt`
+   predates `routes/AppRoutes.jsx`, `api/axios.js`, `i18n/`; `AppointmentController` lives at
+   top level; doctor status includes `on_leave`).
 
 ---
 
@@ -264,11 +345,20 @@ npm run lint                    # ESLint
 
 - **Register page exists but no backend register endpoint** — `Register.jsx` has no working
   API to call.
-- **`/users` page exists but backend has no users/roles CRUD API** — User management is
-  frontend-only right now.
-- `AuthContext.jsx` sets `axios.defaults.baseURL` while `services/api.js` uses its own
-  instance with the same base URL — keep both pointing at `http://127.0.0.1:8000/api`.
+- **`src/layouts/` is dead code** (`AdminLayout`, `DoctorLayout`, `RoleRoute` are unimported).
+  Routing/layout now lives entirely in `src/routes/AppRoutes.jsx`.
+- `AuthContext.jsx` sets `axios.defaults.baseURL` while `services/api.js` uses its own instance
+  (`src/api/axios.js`) with the same base URL — keep both pointing at `http://127.0.0.1:8000/api`.
+- Seeded login passwords are `admin12345` / `doctor12345` / `receptionist12345` — **not** `password`.
+- `users.status` only supports `active`/`inactive`, but `doctors.status` also supports `on_leave`.
+  `DoctorController` deliberately keeps them independent (`on_leave` → user stays `active`).
 - Doctor status enum was extended to include `on_leave` via a raw `DB::statement` migration;
   any revert must clean `on_leave` rows first.
+- Deleting a user/doctor that has clinical history is blocked server-side (422); handle the
+  deactivate-instead-of-delete flow in the UI rather than bypassing it.
+- Doctor/Patient profile pictures live in `storage/app/public` — run `php artisan storage:link`
+  or avatars 404.
+- `Auth/Doctor.jsx` is a stray re-export of the `Doctor` page (an intentional leftover? unconfirmed) —
+  don't delete it without asking.
 - `Doctor` profile data is linked to `users` via `user_id` (1:1); creating a doctor also
   needs a `User` row. Check `DoctorController` before assuming how doctor creation works.

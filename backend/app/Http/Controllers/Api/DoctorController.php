@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Exception;
 
 class DoctorController extends Controller
@@ -72,10 +73,15 @@ class DoctorController extends Controller
                 'gender' => 'required|in:male,female,other',
                 'date_of_birth' => 'nullable|date',
                 'address' => 'nullable|string',
+                'avatar' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
                 'status' => 'required|in:active,inactive,on_leave',
             ]);
 
-            $doctor = DB::transaction(function () use ($validated) {
+            $profilePicture = $request->hasFile('avatar')
+                ? $request->file('avatar')->store('doctor-pictures', 'public')
+                : null;
+
+            $doctor = DB::transaction(function () use ($validated, $profilePicture) {
                 $doctorRole = Role::where('name', 'Doctor')->firstOrFail();
 
                 // users.status only supports active/inactive, while doctors.status
@@ -99,6 +105,7 @@ class DoctorController extends Controller
                     'gender' => $validated['gender'],
                     'date_of_birth' => $validated['date_of_birth'] ?? null,
                     'address' => $validated['address'] ?? null,
+                    'profile_picture' => $profilePicture,
                     'status' => $validated['status'] ?? 'active',
                 ]);
             });
@@ -172,10 +179,20 @@ class DoctorController extends Controller
                 'gender' => 'required|in:male,female,other',
                 'date_of_birth' => 'nullable|date',
                 'address' => 'nullable|string',
+                'avatar' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
                 'status' => 'nullable|in:active,inactive,on_leave',
             ]);
 
-            DB::transaction(function () use ($doctor, $validated) {
+            $profilePicture = $doctor->profile_picture;
+
+            if ($request->hasFile('avatar')) {
+                if ($doctor->profile_picture) {
+                    Storage::disk('public')->delete($doctor->profile_picture);
+                }
+                $profilePicture = $request->file('avatar')->store('doctor-pictures', 'public');
+            }
+
+            DB::transaction(function () use ($doctor, $validated, $profilePicture) {
 
                 // users.status only supports active/inactive, while doctors.status
                 // also supports on_leave — keep the two independent.
@@ -212,6 +229,7 @@ class DoctorController extends Controller
                     'gender' => $validated['gender'],
                     'date_of_birth' => $validated['date_of_birth'] ?? null,
                     'address' => $validated['address'] ?? null,
+                    'profile_picture' => $profilePicture,
                     'status' => $validated['status'] ?? 'active',
                 ]);
             });

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   SlidersHorizontal,
@@ -30,11 +31,12 @@ import { can } from "../utils/permissions";
 
 export default function Doctors() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Search & Filter State
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
 
   // Modal & Menu States
@@ -91,6 +93,7 @@ export default function Doctors() {
   };
 
   const [formData, setFormData] = useState(initialFormState);
+  const [avatarFile, setAvatarFile] = useState(null);
   const canCreate = can(user, "doctors", "create");
   const canUpdate = can(user, "doctors", "update");
   const canDelete = can(user, "doctors", "delete");
@@ -172,10 +175,11 @@ export default function Doctors() {
     }
   };
 
-  // Reads a selected image file and stores it as a data URL for preview + upload
+  // Reads a selected image file for preview + keeps it for multipart upload
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setAvatarFile(file);
     const reader = new FileReader();
     reader.onload = () => {
       setFormData((prev) => ({ ...prev, avatar: reader.result }));
@@ -185,6 +189,7 @@ export default function Doctors() {
 
   const handleOpenAddModal = () => {
     setEditingDoctorId(null);
+    setAvatarFile(null);
     setFormData(initialFormState);
     setIsModalOpen(true);
   };
@@ -194,6 +199,7 @@ export default function Doctors() {
     const matchedDept = departmentList.find((d) => d.name.toLowerCase() === deptName.toLowerCase());
 
     setEditingDoctorId(doctor.id);
+    setAvatarFile(null);
     setFormData({
       name: doctor.user?.name || doctor.name || doctor.full_name || "",
       doctor_code: doctor.doctor_code || doctor.code || "",
@@ -207,7 +213,7 @@ export default function Doctors() {
       date_of_birth: doctor.date_of_birth || "",
       address: doctor.address || "",
       status: (doctor.status || "active").toLowerCase(),
-      avatar: doctor.avatar || doctor.image || "",
+      avatar: doctor.avatar_url || doctor.avatar || doctor.image || "",
       bio: doctor.bio || doctor.description || "",
     });
     setIsModalOpen(true);
@@ -223,11 +229,38 @@ export default function Doctors() {
       return;
     }
 
-    // Make sure department_id is sent as a Number to the Laravel API
-    const payload = {
-      ...formData,
-      department_id: Number(formData.department_id),
-    };
+    // If a new photo was picked, send multipart so the backend can store the
+    // file; otherwise send the plain JSON payload as before.
+    const payload = avatarFile
+      ? (() => {
+          const fd = new FormData();
+          fd.append("name", formData.name);
+          fd.append("email", formData.email);
+          fd.append("phone", formData.phone || "");
+          fd.append("department_id", Number(formData.department_id));
+          fd.append("specialization", formData.specialization);
+          fd.append("license_number", formData.license_number);
+          fd.append("gender", formData.gender);
+          fd.append("date_of_birth", formData.date_of_birth || "");
+          fd.append("address", formData.address || "");
+          fd.append("status", formData.status);
+          fd.append("bio", formData.bio || "");
+          fd.append("avatar", avatarFile);
+          return fd;
+        })()
+      : {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone || "",
+          department_id: Number(formData.department_id),
+          specialization: formData.specialization,
+          license_number: formData.license_number,
+          gender: formData.gender,
+          date_of_birth: formData.date_of_birth || "",
+          address: formData.address || "",
+          status: formData.status,
+          bio: formData.bio || "",
+        };
 
     try {
       if (editingDoctorId) {
@@ -245,6 +278,7 @@ export default function Doctors() {
       }
 
       setIsModalOpen(false);
+      setAvatarFile(null);
       setFormData(initialFormState);
     } catch (error) {
       console.error("Error saving doctor:", error);
@@ -471,9 +505,9 @@ export default function Doctors() {
                       {/* Name & ID Column */}
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          {doc.avatar ? (
+                          {doc.avatar_url || doc.avatar ? (
                             <img
-                              src={doc.avatar}
+                              src={doc.avatar_url || doc.avatar}
                               alt={name}
                               className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-slate-200"
                             />

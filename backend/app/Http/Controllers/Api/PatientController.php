@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Exception;
 
 class PatientController extends Controller
@@ -70,10 +71,17 @@ class PatientController extends Controller
                 'address' => 'nullable|string',
                 'emergency_contact' => 'nullable|string|max:100',
                 'emergency_phone' => 'nullable|string|max:30',
+                'avatar' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
                 'status' => 'nullable|in:active,inactive',
             ]);
 
-            $patient = Patient::create($validated);
+            $profilePicture = $request->hasFile('avatar')
+                ? $request->file('avatar')->store('patient-pictures', 'public')
+                : null;
+
+            $patient = Patient::create(array_merge($validated, [
+                'profile_picture' => $profilePicture,
+            ]));
 
             return response()->json([
                 'success' => true,
@@ -139,10 +147,22 @@ class PatientController extends Controller
                 'address' => 'nullable|string',
                 'emergency_contact' => 'nullable|string|max:100',
                 'emergency_phone' => 'nullable|string|max:30',
+                'avatar' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
                 'status' => 'nullable|in:active,inactive',
             ]);
 
-            $patient->update($validated);
+            $profilePicture = $patient->profile_picture;
+
+            if ($request->hasFile('avatar')) {
+                if ($patient->profile_picture) {
+                    Storage::disk('public')->delete($patient->profile_picture);
+                }
+                $profilePicture = $request->file('avatar')->store('patient-pictures', 'public');
+            }
+
+            $patient->update(array_merge($validated, [
+                'profile_picture' => $profilePicture,
+            ]));
 
             return response()->json([
                 'success' => true,

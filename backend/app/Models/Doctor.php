@@ -18,8 +18,20 @@ class Doctor extends Model
         'gender',
         'date_of_birth',
         'address',
+        'profile_picture',
         'status',
     ];
+
+    protected $appends = [
+        'avatar_url',
+    ];
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        return $this->profile_picture
+            ? asset('storage/' . $this->profile_picture)
+            : null;
+    }
 
     public function user()
     {

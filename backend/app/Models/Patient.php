@@ -20,10 +20,23 @@ class Patient extends Model
         'phone',
         'email',
         'address',
+        'profile_picture',
         'emergency_contact',
         'emergency_phone',
         'status',
     ];
+
+    protected $appends = [
+        'avatar_url',
+    ];
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        return $this->profile_picture
+            ? asset('storage/' . $this->profile_picture)
+            : null;
+    }
+
     public function appointments()
     {
         return $this->hasMany(Appointment::class);
