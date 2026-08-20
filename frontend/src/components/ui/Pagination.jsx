@@ -1,0 +1,52 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useLocale } from "../../context/LocaleContext";
+
+export default function Pagination({
+  page,
+  totalPages,
+  onPageChange,
+  from,
+  to,
+  total,
+  label = "entries",
+}) {
+  const { t } = useLocale();
+  const btnBase =
+    "inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800";
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        {t("pagination.showing", {
+          from,
+          to,
+          total,
+          label,
+        })}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPageChange?.(page - 1)}
+          className={btnBase}
+        >
+          <ChevronLeft size={14} />
+          {t("pagination.previous")}
+        </button>
+        <span className="px-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+          {t("pagination.pageOf", { page, total: totalPages || 1 })}
+        </span>
+        <button
+          type="button"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange?.(page + 1)}
+          className={btnBase}
+        >
+          {t("pagination.next")}
+          <ChevronRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}

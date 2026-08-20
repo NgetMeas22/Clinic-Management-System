@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import {
   AlertTriangle,
+  ArrowUpRight,
   Award,
   Banknote,
   Calendar,
@@ -36,10 +37,12 @@ import {
   TrendingDown,
   TrendingUp,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import dashboardService from "../services/dashboardService";
 import medicineService from "../services/medicineService";
+import paymentService from "../services/paymentService";
 import { getAppointments } from "../services/appointmentService";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../utils/permissions";
@@ -68,6 +71,79 @@ const STATUS_HEX = {
 };
 
 const STATUS_FILTERS = ["all", "confirmed", "pending", "cancelled", "completed"];
+
+const PAYMENT_METHOD_META = {
+  cash: { label: "Cash", color: "#10b981", tint: "bg-emerald-50 text-emerald-700 ring-emerald-600/20" },
+  aba: { label: "ABA", color: "#2563eb", tint: "bg-blue-50 text-blue-700 ring-blue-600/20" },
+  card: { label: "Card", color: "#8b5cf6", tint: "bg-violet-50 text-violet-700 ring-violet-600/20" },
+};
+
+const PAYMENT_STATUS_STYLES = {
+  paid: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+  pending: "bg-amber-50 text-amber-700 ring-amber-600/20",
+  cancelled: "bg-rose-50 text-rose-700 ring-rose-600/20",
+};
+
+const RANGE_LABELS = {
+  week: "this week",
+  month: "this month",
+  year: "this year",
+};
+
+const CARD_META = [
+  {
+    key: "patients",
+    label: "Total patients",
+    icon: Users,
+    valueKey: "total_patients",
+    tint: "from-blue-500 to-blue-600 shadow-blue-500/30",
+    ring: "group-hover:border-blue-200 group-hover:shadow-blue-500/10",
+    dot: "bg-blue-500",
+    sparkKey: "patients",
+    sparkColor: "#2563eb",
+  },
+  {
+    key: "doctors",
+    label: "Total doctors",
+    icon: Stethoscope,
+    valueKey: "total_doctors",
+    tint: "from-violet-500 to-violet-600 shadow-violet-500/30",
+    ring: "group-hover:border-violet-200 group-hover:shadow-violet-500/10",
+    dot: "bg-violet-500",
+    sparkKey: null,
+    sparkColor: "#7c3aed",
+  },
+  {
+    key: "appointments",
+    label: "Appointments today",
+    icon: Calendar,
+    valueKey: "appointments_today",
+    tint: "from-amber-500 to-orange-500 shadow-amber-500/30",
+    ring: "group-hover:border-amber-200 group-hover:shadow-amber-500/10",
+    dot: "bg-amber-500",
+    sparkKey: "appointments",
+    sparkColor: "#d97706",
+  },
+  {
+    key: "revenue",
+    label: "Total revenue",
+    icon: Banknote,
+    valueKey: "total_revenue",
+    tint: "from-emerald-500 to-teal-500 shadow-emerald-500/30",
+    ring: "group-hover:border-emerald-200 group-hover:shadow-emerald-500/10",
+    dot: "bg-emerald-500",
+    sparkKey: "revenue",
+    sparkColor: "#059669",
+  },
+];
+
+function currency(value) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
 
 // Deterministic avatar tint so the same name always gets the same color,
 // giving the table a bit of visual variety instead of one flat blue.
@@ -290,25 +366,34 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [visibleRows, setVisibleRows] = useState(5);
 
+  const canViewPayments = can(user, "payments", "create");
+  const [payments, setPayments] = useState([]);
+
   const loadDashboard = useCallback(async ({ silent } = {}) => {
     try {
       if (silent) setRefreshing(true);
       else setLoading(true);
       setError("");
 
-      const [dashboardRes, yearlyRes, weeklyRes, medicineRes, apptRes] = await Promise.all([
+      const requests = [
         dashboardService.getDashboard(),
         dashboardService.getMonthly(),
         dashboardService.getWeekly(),
         medicineService.getAll(),
         getAppointments(),
-      ]);
+      ];
+      if (canViewPayments) requests.push(paymentService.getAll());
+
+      const [dashboardRes, yearlyRes, weeklyRes, medicineRes, apptRes, paymentRes] =
+        await Promise.all(requests);
 
       setStats(dashboardRes.data || {});
       setMedicines(medicineRes.data || []);
 
       const apptArray = apptRes?.data?.data?.data || apptRes?.data?.data || [];
       setRecentAppointments(Array.isArray(apptArray) ? apptArray : []);
+      const paymentArray = paymentRes?.data?.data?.data || paymentRes?.data?.data || [];
+      setPayments(Array.isArray(paymentArray) ? paymentArray : []);
       setRangeCache((prev) => ({
         ...prev,
         week: weeklyRes.data || {},
@@ -322,7 +407,7 @@ export default function Dashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [canViewPayments]);
 
   useEffect(() => {
     let mounted = true;
@@ -472,44 +557,77 @@ export default function Dashboard() {
     });
   }, [recentAppointments, apptSearch, statusFilter]);
 
-  const cards = [
-    {
-      label: "Total patients",
-      value: (stats?.total_patients ?? 0).toLocaleString(),
-      icon: Users,
-      trend: stats?.total_patients_trend,
-      tint: "bg-blue-50 text-blue-600",
-      sparkKey: "patients",
-      sparkColor: "#2563eb",
-    },
-    {
-      label: "Total doctors",
-      value: (stats?.total_doctors ?? 0).toLocaleString(),
-      icon: Stethoscope,
-      trend: stats?.total_doctors_trend,
-      tint: "bg-violet-50 text-violet-600",
-      sparkKey: null,
-      sparkColor: "#7c3aed",
-    },
-    {
-      label: "Appointments today",
-      value: (stats?.appointments_today ?? 0).toLocaleString(),
-      icon: Calendar,
-      trend: stats?.appointments_today_trend,
-      tint: "bg-amber-50 text-amber-600",
-      sparkKey: "appointments",
-      sparkColor: "#d97706",
-    },
-    {
-      label: "Total revenue",
-      value: `$${Number(stats?.total_revenue || 0).toLocaleString()}`,
-      icon: Banknote,
-      trend: stats?.total_revenue_trend,
-      tint: "bg-emerald-50 text-emerald-600",
-      sparkKey: "revenue",
-      sparkColor: "#059669",
-    },
-  ];
+  // Totals for the currently selected range — used to enrich the stat cards
+  // and the revenue summary with "this week/month/year" context.
+  const rangeTotals = useMemo(() => {
+    return chartData.reduce(
+      (acc, item) => {
+        acc.patients += Number(item.patients || 0);
+        acc.appointments += Number(item.appointments || 0);
+        acc.revenue += Number(item.revenue || 0);
+        return acc;
+      },
+      { patients: 0, appointments: 0, revenue: 0 }
+    );
+  }, [chartData]);
+
+  const bestRevenueDay = useMemo(() => {
+    let best = null;
+    chartData.forEach((item) => {
+      const value = Number(item.revenue || 0);
+      if (value > 0 && (!best || value > best.value)) best = { label: item.label, value };
+    });
+    return best;
+  }, [chartData]);
+
+  const revenueAverage = chartData.length ? rangeTotals.revenue / chartData.length : 0;
+
+  // Payment method breakdown + latest payments (Admin / Receptionist only).
+  const paymentMethods = useMemo(() => {
+    const counts = {};
+    let total = 0;
+    payments.forEach((p) => {
+      const method = (p.payment_method || "cash").toLowerCase();
+      counts[method] = (counts[method] || 0) + 1;
+      total += 1;
+    });
+    return {
+      total,
+      rows: Object.entries(counts)
+        .map(([key, count]) => ({
+          key,
+          count,
+          pct: total ? Math.round((count / total) * 100) : 0,
+          ...(PAYMENT_METHOD_META[key] || {
+            label: key,
+            color: "#94a3b8",
+            tint: "bg-slate-50 text-slate-600 ring-slate-500/20",
+          }),
+        }))
+        .sort((a, b) => b.count - a.count),
+    };
+  }, [payments]);
+
+  const recentPayments = payments.slice(0, 5);
+
+  const cards = CARD_META.map((meta) => {
+    const trendKey = `${meta.valueKey}_trend`;
+    const isCurrency = meta.key === "revenue";
+    const value = isCurrency
+      ? currency(stats?.[meta.valueKey])
+      : (stats?.[meta.valueKey] ?? 0).toLocaleString();
+    let footer;
+    if (meta.key === "patients") {
+      footer = `+${rangeTotals.patients.toLocaleString()} ${RANGE_LABELS[range]}`;
+    } else if (meta.key === "doctors") {
+      footer = topDoctors[0] ? `Busiest: ${topDoctors[0].name}` : "On active roster";
+    } else if (meta.key === "appointments") {
+      footer = pendingCount > 0 ? `${pendingCount} awaiting confirmation` : "No pending bookings";
+    } else {
+      footer = `${currency(rangeTotals.revenue)} this ${RANGE_LABELS[range]}`;
+    }
+    return { ...meta, value, trend: stats?.[trendKey], footer };
+  });
 
   if (loading) {
     return (
@@ -668,24 +786,31 @@ export default function Dashboard() {
           return (
             <div
               key={card.label}
-              className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+              className={`group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${card.ring}`}
             >
+              <span className={`absolute inset-x-0 top-0 h-1 bg-linear-to-r ${card.tint.split(" ").slice(0, 2).join(" ")}`} />
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.label}</p>
-                <div className={`rounded-lg p-2 transition-transform duration-200 group-hover:scale-105 ${card.tint}`}>
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br text-white shadow-lg transition-transform duration-200 group-hover:scale-110 ${card.tint}`}
+                >
                   <Icon size={18} />
                 </div>
               </div>
-              <div className="mt-4 flex items-end justify-between">
-                <div>
-                  <p className="text-3xl font-bold text-slate-900">{card.value}</p>
-                  <div className="mt-1.5">
+              <div className="mt-4 flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-3xl font-bold tracking-tight text-slate-900">{card.value}</p>
+                  <div className="mt-2 flex items-center gap-2">
                     <TrendBadge value={card.trend} />
                   </div>
                 </div>
                 {card.sparkKey && (
                   <Sparkline data={chartData} dataKey={card.sparkKey} color={card.sparkColor} />
                 )}
+              </div>
+              <div className="mt-3 flex items-center gap-1.5 border-t border-slate-100 pt-3 text-xs font-medium text-slate-500">
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${card.dot}`} />
+                <span className="truncate">{card.footer}</span>
               </div>
             </div>
           );
@@ -788,17 +913,61 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
-          <h2 className="text-base font-bold text-slate-900">Revenue</h2>
-          <p className="text-xs text-slate-500">
-            Revenue {range === "year" ? "this year" : range === "month" ? "this month" : "this week"}
-          </p>
-          <div className="mt-4 h-72">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Revenue</h2>
+              <p className="text-xs text-slate-500">Earnings {RANGE_LABELS[range]}</p>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+              <TrendingUp size={12} />
+              {RANGE_LABELS[range]}
+            </span>
+          </div>
+
+          <div className="mt-4 rounded-xl bg-slate-50 p-4 ring-1 ring-inset ring-slate-100">
+            <div className="flex items-baseline justify-between gap-2">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  Total {RANGE_LABELS[range]}
+                </p>
+                <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+                  {currency(rangeTotals.revenue)}
+                </p>
+              </div>
+              <Link
+                to="/billing"
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+              >
+                Billing <ArrowUpRight size={12} />
+              </Link>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200/70 pt-3 text-xs">
+              <div>
+                <p className="text-slate-400">Daily average</p>
+                <p className="mt-0.5 font-semibold text-slate-700">{currency(revenueAverage)}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Best day</p>
+                <p className="mt-0.5 truncate font-semibold text-emerald-600">
+                  {bestRevenueDay ? `${bestRevenueDay.label} · ${currency(bestRevenueDay.value)}` : "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 h-52">
             {isChartLoading ? (
               <ChartSkeleton variant="bar" />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="revenueBar" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#059669" stopOpacity={1} />
+                      <stop offset="100%" stopColor="#34d399" stopOpacity={0.55} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                   <XAxis
                     dataKey="label"
@@ -812,17 +981,180 @@ export default function Dashboard() {
                     axisLine={false}
                     tickLine={false}
                     width={44}
-                    tickFormatter={compactNumber}
+                    tickFormatter={(v) => `$${compactNumber(v)}`}
                     allowDecimals={false}
                   />
                   <Tooltip content={<ChartTooltip />} cursor={{ fill: "#f1f5f9" }} />
-                  <Bar dataKey="revenue" fill="#2563eb" radius={[6, 6, 0, 0]} maxBarSize={22} isAnimationActive />
+                  <Bar dataKey="revenue" fill="url(#revenueBar)" radius={[6, 6, 0, 0]} maxBarSize={22} isAnimationActive />
                 </BarChart>
               </ResponsiveContainer>
             )}
           </div>
         </div>
       </div>
+
+      {/* Payments (Admin / Receptionist) */}
+      {canViewPayments && (
+        <div className="grid gap-4 xl:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Payment methods</h2>
+                <p className="text-xs text-slate-500">{paymentMethods.total} payments collected</p>
+              </div>
+              <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
+                <Wallet size={18} />
+              </div>
+            </div>
+            {paymentMethods.rows.length > 0 ? (
+              <div className="mt-4 flex items-center gap-4">
+                <div className="h-28 w-28 shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={paymentMethods.rows}
+                        dataKey="count"
+                        nameKey="label"
+                        innerRadius={30}
+                        outerRadius={50}
+                        paddingAngle={2}
+                        stroke="none"
+                      >
+                        {paymentMethods.rows.map((row) => (
+                          <Cell key={row.key} fill={row.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex flex-1 flex-col gap-2">
+                  {paymentMethods.rows.map((row) => (
+                    <div key={row.key} className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1.5 text-slate-600">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: row.color }} />
+                        {row.label}
+                      </span>
+                      <span className="font-semibold text-slate-900">
+                        {row.count} <span className="font-normal text-slate-400">· {row.pct}%</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4">
+                <EmptyState
+                  icon={Wallet}
+                  title="No payments yet"
+                  description="Collected payments will show up here by method."
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md xl:col-span-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-900">Recent payments</h2>
+              <Link
+                to="/payments"
+                className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700"
+              >
+                View all <ChevronRight size={14} />
+              </Link>
+            </div>
+            {recentPayments.length > 0 ? (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <th className="pb-3 pr-4 font-semibold">Patient</th>
+                      <th className="pb-3 pr-4 font-semibold">Method</th>
+                      <th className="pb-3 pr-4 font-semibold">Status</th>
+                      <th className="pb-3 pr-4 text-right font-semibold">Amount</th>
+                      <th className="pb-3 font-semibold">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {recentPayments.map((payment) => {
+                      const method = PAYMENT_METHOD_META[payment.payment_method] || {
+                        label: payment.payment_method,
+                        tint: "bg-slate-50 text-slate-600 ring-slate-500/20",
+                      };
+                      const status = (payment.payment_status || "").toLowerCase();
+                      const patientName =
+                        `${payment.patient?.first_name || ""} ${payment.patient?.last_name || ""}`.trim() || "Unknown";
+                      const doctorName = payment.appointment?.doctor?.user?.name || "—";
+                      return (
+                        <tr key={payment.id} className="text-slate-700 transition-colors hover:bg-slate-50">
+                          <td className="py-3 pr-4">
+                            <div className="flex items-center gap-3">
+                              {payment.patient?.avatar_url ? (
+                                <img
+                                  src={payment.patient.avatar_url}
+                                  alt={patientName}
+                                  className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-slate-200"
+                                />
+                              ) : (
+                                <span
+                                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarTint(
+                                    patientName
+                                  )}`}
+                                >
+                                  {initialsOf(patientName)}
+                                </span>
+                              )}
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-slate-900">{patientName}</p>
+                                <p className="truncate text-xs text-slate-400">Dr. {doctorName}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 pr-4">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ring-inset ${method.tint}`}
+                            >
+                              {method.label}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-4">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ring-inset ${
+                                PAYMENT_STATUS_STYLES[status] || PAYMENT_STATUS_STYLES.pending
+                              }`}
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              {payment.payment_status || status}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-4 text-right font-semibold text-slate-900">
+                            {currency(payment.amount)}
+                          </td>
+                          <td className="py-3 text-xs text-slate-400">
+                            {payment.payment_date
+                              ? new Date(payment.payment_date).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                })
+                              : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="mt-4">
+                <EmptyState
+                  icon={Wallet}
+                  title="No recent payments"
+                  description="Once payments are recorded they'll be listed here."
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Appointments + inventory */}
       <div className="grid gap-4 xl:grid-cols-3">

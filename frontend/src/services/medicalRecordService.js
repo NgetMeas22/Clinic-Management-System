@@ -16,6 +16,14 @@ const medicalRecordService = {
         return response.data;
     },
 
+    getByPatient: async (patientId) => {
+        const response = await api.get('/medical-records', {
+            params: { patient_id: patientId },
+        });
+
+        return response.data;
+    },
+
     create: async (data) => {
         const response = await api.post(
             '/medical-records',

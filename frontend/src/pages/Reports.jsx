@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 import {
+  CalendarDays,
+  Download,
   FileText,
+  Inbox,
+  Package,
+  Printer,
   Stethoscope,
   Users,
-  CalendarDays,
   Wallet,
-  Package,
-  Download,
-  Inbox,
 } from "lucide-react";
 import reportService from "../services/reportService";
+import { Button, Card, PageHeader } from "../components/ui";
 
 export default function Reports() {
   const reportTypes = [
@@ -70,11 +72,7 @@ export default function Reports() {
     return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   };
 
-  const nameOf = (row, keys) => {
-    for (const key of keys) {
-      const value = row?.[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
+  const nameOf = (row) => {
     const user = row?.user;
     if (user?.name) return user.name;
     const first = row?.first_name;
@@ -90,7 +88,7 @@ export default function Reports() {
           headers: ["ID", "Name", "Specialization", "Department", "Phone", "Status"],
           cells: (r) => [
             r.id,
-            nameOf(r, []),
+            nameOf(r),
             r.specialization || "—",
             r.department?.name || "—",
             r.user?.phone || r.phone || "—",
@@ -102,7 +100,7 @@ export default function Reports() {
           headers: ["ID", "Name", "Gender", "Phone", "Status"],
           cells: (r) => [
             r.id,
-            nameOf(r, []),
+            nameOf(r),
             r.gender ? r.gender.charAt(0).toUpperCase() + r.gender.slice(1) : "—",
             r.phone || "—",
             r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1) : "—",
@@ -280,22 +278,12 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="rounded-xl bg-blue-50 p-3 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
-          <FileText size={24} strokeWidth={2} />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Reports
-          </h1>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-            Generate and review operational reports across the clinic.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={FileText}
+        title="Reports"
+        subtitle="Generate and review operational reports across the clinic."
+      />
 
-      {/* Report type chips */}
       <div className="flex flex-wrap gap-2">
         {reportTypes.map((r) => {
           const Icon = r.icon;
@@ -317,33 +305,21 @@ export default function Reports() {
         })}
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-500 dark:text-slate-400">
-            {rows.length} record{rows.length === 1 ? "" : "s"}
-          </span>
-        </div>
-
+      <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <span className="text-sm text-slate-500 dark:text-slate-400">
+          {rows.length} record{rows.length === 1 ? "" : "s"}
+        </span>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <button
-            onClick={exportPdf}
-            disabled={rows.length === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
-          >
-            <FileText size={15} />
+          <Button variant="secondary" onClick={exportPdf} disabled={rows.length === 0}>
+            <Printer size={15} />
             Export PDF
-          </button>
-          <button
-            onClick={exportCsv}
-            disabled={rows.length === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
-          >
+          </Button>
+          <Button onClick={exportCsv} disabled={rows.length === 0}>
             <Download size={15} />
             Export CSV
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
@@ -351,26 +327,22 @@ export default function Reports() {
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/40">
+              <tr className="border-b border-slate-200 bg-slate-50/70 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
                 {headers.map((col) => (
-                  <th
-                    key={col}
-                    className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
-                  >
+                  <th key={col} className="px-5 py-3 text-left">
                     {col}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                  <tr key={i}>
                     {headers.map((__, j) => (
                       <td key={j} className="px-5 py-3">
                         <div className="h-4 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
@@ -380,7 +352,7 @@ export default function Reports() {
                 ))
               ) : rows.length > 0 ? (
                 rows.map((row, i) => (
-                  <tr key={row.id ?? i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 dark:border-slate-800 dark:hover:bg-slate-800/40">
+                  <tr key={row.id ?? i} className="transition-colors hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
                     {cells(row).map((cell, j) => (
                       <td key={j} className="px-5 py-3 text-slate-600 dark:text-slate-300">
                         {cell}
@@ -410,7 +382,7 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

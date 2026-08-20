@@ -56,6 +56,12 @@ export const translations = {
     "common.cancel": "Cancel",
     "common.saving": "Saving…",
     "common.loading": "Loading…",
+    "common.close": "Close",
+
+    "pagination.previous": "Previous",
+    "pagination.next": "Next",
+    "pagination.pageOf": "Page {page} of {total}",
+    "pagination.showing": "Showing {from} to {to} of {total} {label}",
 
     "page.dashboard": "Dashboard",
     "page.departments": "Departments",
@@ -177,6 +183,12 @@ export const translations = {
     "common.cancel": "បោះបង់",
     "common.saving": "កំពុងរក្សាទុក…",
     "common.loading": "កំពុងផ្ទុក…",
+    "common.close": "បិទ",
+
+    "pagination.previous": "មុន",
+    "pagination.next": "បន្ទាប់",
+    "pagination.pageOf": "ទំព័រ {page} នៃ {total}",
+    "pagination.showing": "បង្ហាញ {from} ដល់ {to} នៃ {total} {label}",
 
     "page.dashboard": "ផ្ទាំងគ្រប់គ្រង",
     "page.departments": "នាយកដ្ឋាន",

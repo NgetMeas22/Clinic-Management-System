@@ -1,16 +1,24 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import {
-  Search,
-  SlidersHorizontal,
-  Plus,
-  ChevronLeft,
-  ChevronRight,
+  Calendar,
+  CalendarDays,
+  Clock,
   MoreVertical,
   Pencil,
+  Plus,
+  SlidersHorizontal,
   Trash2,
-  Calendar,
-  Clock,
+  User,
 } from "lucide-react";
+import {
+  Badge,
+  Button,
+  Card,
+  PageHeader,
+  SearchInput,
+  SelectInput,
+} from "../components/ui";
+import { statusTone } from "../components/ui";
 
 export default function AppointmentsManager({
   appointments = [],
@@ -22,42 +30,16 @@ export default function AppointmentsManager({
   onEdit,
   onDelete,
 }) {
-  const [searchTerm, setSearchTerm] = useState(search || "");
-  const [selectedStatus, setSelectedStatus] = useState(status || "All Statuses");
-  const [activeMenuId, setActiveMenuId] = useState(null);
+  const statusFilter = status || "All Statuses";
+  const updateSearch = (value) => setSearch(value);
+  const updateStatus = (value) => setStatus(value === "All Statuses" ? "" : value);
 
-  // When the parent controls search/status, mirror its values so server-side
-  // filtering in Appointments.jsx stays in sync with the local inputs.
-  const query = setSearch ? search : searchTerm;
-  const statusFilter = setStatus ? status || "All Statuses" : selectedStatus;
-  const updateSearch = (value) => (setSearch ? setSearch(value) : setSearchTerm(value));
-  const updateStatus = (value) => (setStatus ? setStatus(value) : setSelectedStatus(value));
-
-  // Status style helper
-  const getStatusBadge = (status) => {
-    const s = (status || "").toLowerCase();
-    switch (s) {
-      case "confirmed":
-        return "bg-blue-100 text-blue-700";
-      case "completed":
-        return "bg-emerald-100 text-emerald-700";
-      case "pending":
-        return "bg-amber-100 text-amber-700";
-      case "cancelled":
-        return "bg-rose-100 text-rose-700";
-      default:
-        return "bg-slate-100 text-slate-700";
-    }
-  };
-
-  // Helper to extract patient initials for avatar placeholder
   const getInitials = (firstName = "", lastName = "") => {
     const first = firstName ? firstName[0] : "";
     const last = lastName ? lastName[0] : "";
     return (first + last).toUpperCase() || "P";
   };
 
-  // Filter appointments based on search and status filter
   const filteredAppointments = useMemo(() => {
     return appointments.filter((item) => {
       const patientName = `${item.patient?.first_name || ""} ${
@@ -66,7 +48,7 @@ export default function AppointmentsManager({
       const doctorName = (item.doctor?.user?.name || item.doctor?.name || "").toLowerCase();
       const reason = (item.reason || "").toLowerCase();
       const status = (item.status || "").toLowerCase();
-      const q = String(query || "").toLowerCase();
+      const q = String(search || "").toLowerCase();
 
       const matchesSearch =
         patientName.includes(q) ||
@@ -74,103 +56,91 @@ export default function AppointmentsManager({
         reason.includes(q);
 
       const matchesStatus =
-        !statusFilter || statusFilter === "All Statuses" ||
+        !statusFilter ||
+        statusFilter === "All Statuses" ||
         status === String(statusFilter).toLowerCase();
 
       return matchesSearch && matchesStatus;
     });
-  }, [appointments, query, statusFilter]);
+  }, [appointments, search, statusFilter]);
 
   return (
-    <div className="p-6 md:p-8 bg-slate-50 min-h-screen space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Appointments</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage and track patient consultation schedules.
-          </p>
-        </div>
-        {onAdd && (
-          <button
-            onClick={onAdd}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg shadow-sm transition-colors"
-          >
-            <Plus size={18} />
-            <span>New Appointment</span>
-          </button>
-        )}
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={CalendarDays}
+        title="Appointments"
+        subtitle="Manage and track patient consultation schedules."
+        actions={
+          onAdd && (
+            <Button onClick={onAdd}>
+              <Plus size={18} />
+              New Appointment
+            </Button>
+          )
+        }
+      />
 
-      {/* Search & Filter Toolbar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex flex-1 flex-col sm:flex-row items-center gap-3 w-full">
-          {/* Search Bar */}
-          <div className="relative w-full sm:w-80">
-            <Search
-              size={16}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              type="text"
-              placeholder="Search patient, doctor, or reason..."
-              value={query}
-              onChange={(e) => updateSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-            />
-          </div>
+      <Card className="flex flex-col gap-3 p-4 md:flex-row md:items-center">
+        <SearchInput
+          value={search}
+          onChange={updateSearch}
+          placeholder="Search patient, doctor, or reason..."
+          className="md:max-w-sm"
+        />
+        <SelectInput
+          value={statusFilter}
+          onChange={(e) => updateStatus(e.target.value)}
+          className="w-full md:w-44"
+        >
+          <option value="All Statuses">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </SelectInput>
 
-          {/* Status Select Filter */}
-          <div className="w-full sm:w-auto">
-            <select
-              value={statusFilter}
-              onChange={(e) => updateStatus(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            >
-              <option value="All Statuses">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-        </div>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            updateSearch("");
+            updateStatus("All Statuses");
+          }}
+          title="Reset filters"
+          className="w-full md:w-auto"
+        >
+          <SlidersHorizontal size={16} />
+          Reset
+        </Button>
+      </Card>
 
-        {/* Action Button */}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          <button
-            type="button"
-            title="Reset filters"
-            onClick={() => {
-              updateSearch("");
-              updateStatus("All Statuses");
-            }}
-            className="p-2.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            <SlidersHorizontal size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* Table Section */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <Card>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-xs font-bold text-slate-500 tracking-wider uppercase">
-                <th className="py-3.5 px-6">Patient Name</th>
-                <th className="py-3.5 px-6">Doctor</th>
-                <th className="py-3.5 px-6">Schedule</th>
-                <th className="py-3.5 px-6">Reason</th>
-                <th className="py-3.5 px-6">Status</th>
-                <th className="py-3.5 px-6 text-right">Actions</th>
+              <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
+                <th className="px-6 py-3.5 text-left">Patient Name</th>
+                <th className="px-6 py-3.5 text-left">Doctor</th>
+                <th className="px-6 py-3.5 text-left">Schedule</th>
+                <th className="px-6 py-3.5 text-left">Reason</th>
+                <th className="px-6 py-3.5 text-left">Status</th>
+                <th className="px-6 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredAppointments.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-slate-500">
-                    No appointments found.
+                  <td colSpan="6" className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <CalendarDays size={26} strokeWidth={1.5} />
+                      <p className="font-medium text-slate-600 dark:text-slate-300">
+                        No appointments found.
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {search || statusFilter !== "All Statuses"
+                          ? "Try a different search or filter."
+                          : "Schedule a new consultation to get started."}
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -194,19 +164,18 @@ export default function AppointmentsManager({
                   return (
                     <tr
                       key={item.id}
-                      className="hover:bg-slate-50/80 transition-colors"
+                      className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                     >
-                      {/* Patient Name with Avatar Badge */}
-                      <td className="py-4 px-6">
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {item.patient?.avatar_url ? (
                             <img
                               src={item.patient.avatar_url}
                               alt={patientName}
-                              className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-slate-200"
+                              className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700"
                             />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 text-xs font-semibold flex items-center justify-center shrink-0">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                               {getInitials(
                                 item.patient?.first_name,
                                 item.patient?.last_name
@@ -214,7 +183,7 @@ export default function AppointmentsManager({
                             </div>
                           )}
                           <div>
-                            <div className="font-semibold text-slate-900">
+                            <div className="font-semibold text-slate-900 dark:text-white">
                               {patientName}
                             </div>
                             <div className="text-xs text-slate-400">
@@ -224,18 +193,13 @@ export default function AppointmentsManager({
                         </div>
                       </td>
 
-                      {/* Doctor Name */}
-                      <td className="py-4 px-6">
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-2.5">
-                          {item.doctor?.avatar_url && (
-                            <img
-                              src={item.doctor.avatar_url}
-                              alt={doctorName}
-                              className="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-slate-200"
-                            />
-                          )}
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                            <User size={14} />
+                          </div>
                           <div>
-                            <div className="font-semibold text-blue-600">
+                            <div className="font-semibold text-blue-600 dark:text-blue-400">
                               {doctorName}
                             </div>
                             <div className="text-xs text-slate-400">
@@ -245,82 +209,55 @@ export default function AppointmentsManager({
                         </div>
                       </td>
 
-                      {/* Date & Time */}
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
                           <Calendar size={14} className="text-slate-400" />
                           <span>{item.appointment_date || "N/A"}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400">
                           <Clock size={12} />
                           <span>{formattedTime}</span>
                         </div>
                       </td>
 
-                      {/* Reason Column */}
-                      <td className="py-4 px-6 text-slate-600 max-w-xs truncate">
-                        <span className="inline-block px-2.5 py-1 bg-slate-100 rounded text-xs font-medium text-slate-600 border border-slate-200/60">
+                      <td className="max-w-xs truncate px-6 py-4 text-slate-600 dark:text-slate-300">
+                        <span className="inline-block rounded border border-slate-200/60 bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                           {item.reason || "General Checkup"}
                         </span>
                       </td>
 
-                      {/* Status Badge */}
-                      <td className="py-4 px-6">
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(
-                            item.status
-                          )}`}
-                        >
-                          {item.status || "Pending"}
-                        </span>
+                      <td className="px-6 py-4">
+                        <Badge tone={statusTone(item.status)} label={item.status || "pending"} />
                       </td>
 
-                      {/* Action Popup */}
-                      <td className="py-4 px-6 text-right relative">
-                        <button
-                          onClick={() =>
-                            setActiveMenuId(
-                              activeMenuId === item.id ? null : item.id
-                            )
-                          }
-                          className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-
-                        {activeMenuId === item.id && (
-                          <div className="absolute right-6 top-12 w-32 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20 text-left">
-                            {onEdit && (
-                              <button
-                                onClick={() => {
-                                  setActiveMenuId(null);
-                                  onEdit(item);
-                                }}
-                                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                              >
-                                <Pencil size={14} />
-                                <span>Edit</span>
-                              </button>
-                            )}
-                            {onDelete && (
-                              <button
-                                onClick={() => {
-                                  setActiveMenuId(null);
-                                  onDelete(item.id);
-                                }}
-                                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50"
-                              >
-                                <Trash2 size={14} />
-                                <span>Delete</span>
-                              </button>
-                            )}
-                            {!onEdit && !onDelete && (
-                              <div className="px-3.5 py-2 text-xs font-semibold text-slate-500">
-                                View only
-                              </div>
-                            )}
-                          </div>
-                        )}
+                      <td className="relative px-6 py-4 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          {onEdit && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onEdit(item)}
+                              className="text-blue-600 hover:!bg-blue-50 dark:text-blue-400 dark:hover:!bg-blue-950/40"
+                            >
+                              <Pencil size={14} />
+                              Edit
+                            </Button>
+                          )}
+                          {onDelete && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onDelete(item.id)}
+                              className="text-red-600 hover:!bg-red-50 dark:text-red-400 dark:hover:!bg-red-950/30"
+                            >
+                              <Trash2 size={14} />
+                              Delete
+                            </Button>
+                          )}
+                          {!onEdit && !onDelete && (
+                            <MoreVertical size={18} className="text-slate-400" />
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -330,44 +267,23 @@ export default function AppointmentsManager({
           </table>
         </div>
 
-        {/* Footer Pagination */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-slate-200 bg-white">
-          <div className="text-sm text-slate-500">
-            Showing <span className="font-semibold text-slate-800">1</span> to{" "}
-            <span className="font-semibold text-slate-800">
-              {filteredAppointments.length}
-            </span>{" "}
-            of{" "}
-            <span className="font-semibold text-slate-800">
-              {appointments.length}
-            </span>{" "}
-            entries
+        {filteredAppointments.length > 0 && (
+          <div className="flex flex-col items-center justify-between gap-2 border-t border-slate-200 px-6 py-4 sm:flex-row dark:border-slate-800">
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              Showing{" "}
+              <span className="font-semibold text-slate-800 dark:text-slate-200">1</span> to{" "}
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {filteredAppointments.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {appointments.length}
+              </span>{" "}
+              entries
+            </div>
           </div>
-
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled
-              className="p-2 border border-slate-200 rounded-lg text-slate-300 disabled:opacity-50 cursor-not-allowed"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button className="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
-              1
-            </button>
-            <button className="w-8 h-8 rounded-lg text-slate-400 font-semibold text-xs flex items-center justify-center">
-              2
-            </button>
-            <button
-              type="button"
-              disabled
-              className="p-2 border border-slate-200 rounded-lg text-slate-300 cursor-not-allowed"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
+        )}
+      </Card>
     </div>
   );
 }

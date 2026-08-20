@@ -14,20 +14,17 @@ import { getPatients } from "../services/patientService";
 import { getDoctors } from "../services/doctorService";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../utils/permissions";
+import useUrlSearch from "../hooks/useUrlSearch";
 
 /* eslint-disable react-hooks/set-state-in-effect */
 
 const Appointments = () => {
     const { user } = useAuth();
-    // =========================
-    // State
-    // =========================
-
     const [appointments, setAppointments] = useState([]);
     const [patients, setPatients] = useState([]);
     const [doctors, setDoctors] = useState([]);
 
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useUrlSearch();
     const [status, setStatus] = useState("");
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,22 +35,14 @@ const Appointments = () => {
     const canUpdate = can(user, "appointments", "update");
     const canDelete = can(user, "appointments", "delete");
 
-    // =========================
-    // Load Appointments
-    // =========================
-
     const loadAppointments = useCallback(async () => {
         try {
-            const response = await getAppointments({ search, status });
+            const response = await getAppointments({ search: search || undefined, status: status || undefined });
             setAppointments(response.data?.data?.data || response.data?.data || []);
         } catch (error) {
             console.error("Failed to load appointments:", error);
         }
     }, [search, status]);
-
-    // =========================
-    // Load Patients & Doctors
-    // =========================
 
     const loadPatients = async () => {
         try {
@@ -82,10 +71,6 @@ const Appointments = () => {
         loadAppointments();
     }, [loadAppointments]);
 
-    // =========================
-    // Modal Handlers
-    // =========================
-
     const handleCreate = () => {
         setSelectedAppointment(null);
         setIsModalOpen(true);
@@ -100,10 +85,6 @@ const Appointments = () => {
         setIsModalOpen(false);
         setSelectedAppointment(null);
     };
-
-    // =========================
-    // Create / Update Submit
-    // =========================
 
     const handleSubmit = async (data) => {
         try {
@@ -129,10 +110,6 @@ const Appointments = () => {
         }
     };
 
-    // =========================
-    // Delete Handler
-    // =========================
-
     const handleDelete = async (id) => {
         if (!window.confirm("Are you sure you want to delete this appointment?")) {
             return;
@@ -150,7 +127,6 @@ const Appointments = () => {
 
     return (
         <div className="w-full">
-            {/* Table component manages its own UI header & search */}
             <AppointmentTable
                 appointments={appointments}
                 search={search}
@@ -162,7 +138,6 @@ const Appointments = () => {
                 onDelete={canDelete ? handleDelete : null}
             />
 
-            {/* Appointment Modal */}
             {(canCreate || canUpdate) && (
                 <AppointmentModal
                     isOpen={isModalOpen}
