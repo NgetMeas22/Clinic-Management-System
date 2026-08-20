@@ -32,7 +32,7 @@ export default function LanguageSwitcher({ compact = false }) {
         English
       </button>
       <button onClick={() => setLocale("km")} className={btnClass(locale === "km")}>
-        ខ្មែរ
+        Khmer
       </button>
     </div>
   );

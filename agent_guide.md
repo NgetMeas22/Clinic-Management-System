@@ -289,6 +289,12 @@ Tailwind CSS v4 (utility classes in JSX). Support dark mode via `dark:` variants
 existing components (modal/table/form patterns in `components/`) instead of inventing new
 ones.
 
+Khmer font: **Kantumruy Pro** (Google Fonts), imported in `src/index.css` with weights
+`400;600;700`. It is applied globally to `html` and forced across all elements when the locale
+is Khmer (`html[lang="km"]`, `:lang(km)`). For prominent headings/titles use the `.khmer-title`
+utility class (`font-family: 'Kantumruy Pro', sans-serif; font-weight: 700`). Do not introduce
+other Khmer fonts.
+
 ---
 
 ## 8. Common commands
