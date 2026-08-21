@@ -24,6 +24,8 @@ class User extends Authenticatable
         'phone',
         'profile_picture',
         'status',
+        'google_id', // 👈 បានបន្ថែម
+        'avatar',    // 👈 បានបន្ថែម
     ];
 
     /**
@@ -43,7 +45,7 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
+        'password'          => 'hashed',
     ];
 
     protected $appends = [
@@ -63,8 +65,15 @@ class User extends Authenticatable
         return $this->hasOne(Doctor::class);
     }
 
+    /**
+     * Accessor សម្រាប់ទាញយក URL រូបភាព (ទ្រទ្រង់ទាំង Google Avatar និង Local Storage)
+     */
     public function getAvatarUrlAttribute(): ?string
     {
+        if ($this->avatar) {
+            return $this->avatar;
+        }
+
         return $this->profile_picture
             ? asset('storage/' . $this->profile_picture)
             : null;

@@ -13,9 +13,16 @@ use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\AppointmentController;
+use App\Http\Controllers\Auth\GoogleController;
+use App\Http\Controllers\SupportController;
 
 // Public Routes
 Route::post('/login', [AuthController::class, 'login']);
+
+Route::post('/support/send', [SupportController::class, 'sendSupportMessage']);
+
+Route::get('/auth/google', [GoogleController::class, 'redirect']);
+Route::get('/auth/google/callback', [GoogleController::class, 'callback']);
 
 // Authenticated Routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -104,3 +111,4 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('/reports/payments', [ReportController::class, 'payments']);
     Route::get('/reports/medicines', [ReportController::class, 'medicines']);
 });
+

@@ -23,6 +23,8 @@ Development environment is Windows + **Laragon** + **MySQL** (managed via HeidiS
 | Layer     | Technology                                              |
 |-----------|---------------------------------------------------------|
 | Backend   | PHP ^8.1, Laravel ^10.10, Laravel Sanctum ^3.3          |
+| Auth (social) | Laravel Socialite ^5.30 (Google OAuth, stateless)  |
+| Integrations | Telegram Bot API (support messages via `Http` client) |
 | Database  | MySQL (`clinic_management`, utf8mb4_unicode_ci)         |
 | Frontend  | React 19, Vite 8, Tailwind CSS 4, react-router-dom 7    |
 | Frontend libs | axios, recharts (charts), lucide-react (icons)      |
@@ -65,7 +67,9 @@ clinic-management-system/
 │   │                               # DoctorController, PatientController, MedicalRecordController,
 │   │                               # MedicineController, PrescriptionController, PaymentController,
 │   │                               # ReportController, UserController
+│   ├── app/Http/Controllers/Auth/GoogleController.php  # Google OAuth (Socialite, stateless)
 │   ├── app/Http/Controllers/AppointmentController.php   # (top-level, imported specially in routes)
+│   ├── app/Http/Controllers/SupportController.php       # (top-level; forwards support msgs to Telegram)
 │   ├── app/Http/Middleware/RoleMiddleware.php           # registered as `role`
 │   ├── app/Models/          # User, Role, Department, Doctor, Patient, Appointment,
 │   │                        # MedicalRecord, Medicine (SoftDeletes), Prescription,
@@ -80,8 +84,12 @@ clinic-management-system/
 │       ├── api/axios.js            # single shared axios instance (baseURL, interceptors)
 │       ├── components/             # ProtectedRoute, LanguageSwitcher, AppointmentModal/Form/Table,
 │       │   │                       # PrescriptionFormModal
-│       │   └── common/layout/      # Navbar.jsx, Sidebar.jsx, Footer.jsx
+│       │   ├── common/layout/      # Navbar.jsx, Sidebar.jsx, Footer.jsx
+│       │   └── ui/                 # shared UI kit (see §7): Button, Card, Badge, Modal, Table,
+│       │                           # Field/TextInput/SelectInput/TextArea, SearchInput,
+│       │                           # Pagination, EmptyState, PageHeader, statusTone (index.js barrel)
 │       ├── context/                # AuthContext.jsx, ThemeContext.jsx, LocaleContext.jsx
+│       ├── hooks/useUrlSearch.js   # syncs a search term with the `?search=` URL param
 │       ├── i18n/translations.js    # km + en label strings (see §7)
 │       ├── layouts/                # AdminLayout/DoctorLayout/RoleRoute — DEAD CODE, no longer imported
 │       ├── pages/                  # one file per feature (see §7)
@@ -145,8 +153,9 @@ The running schema also includes the newer **alter migrations** listed below.
 Tables (11 domain tables):
 
 1. **roles** — id, name (unique), description
-2. **users** — role_id FK→roles, name, email (unique), password, phone, **profile_picture**,
-   status (active/inactive)
+2. **users** — role_id FK→roles, name, email (unique), password (**nullable** since Google
+   OAuth users have no local password), phone, **google_id**, **avatar** (Google profile
+   picture URL), profile_picture, status (active/inactive)
 3. **departments** — name (unique), description, status
 4. **doctors** — user_id (unique FK→users, cascade), department_id FK→departments,
    specialization, license_number (unique), gender, date_of_birth, address, **profile_picture**,
@@ -173,6 +182,8 @@ Tables (11 domain tables):
 - `2026_08_17_010000` — add `medicines.deleted_at` (soft deletes).
 - `2026_08_18_000000` — add `doctors.profile_picture` (nullable string).
 - `2026_08_18_010000` — add `patients.profile_picture` (nullable string).
+- `2026_08_21_030410` — add `users.google_id` + `users.avatar` (nullable strings) and make
+  `users.password` nullable (for Google OAuth accounts).
 
 Key relationships (Eloquent):
 - User 1—1 Doctor; User N—1 Role
@@ -180,7 +191,8 @@ Key relationships (Eloquent):
 - Patient 1—N Appointment / MedicalRecord / Prescription / Payment
 - Appointment 1—1 MedicalRecord; 1—N Payment
 - MedicalRecord 1—N Prescription; Prescription 1—N PrescriptionItem N—1 Medicine
-- `User` model has an `avatar_url` accessor → `asset('storage/'.$profile_picture)`.
+- `User` model has an `avatar_url` accessor: prefers the Google `avatar` URL when present,
+  otherwise falls back to `asset('storage/'.$profile_picture)`.
 - `Medicine` uses the `SoftDeletes` trait.
 
 ### Seeded data (`DatabaseSeeder`)
@@ -202,7 +214,26 @@ Key relationships (Eloquent):
 
 ## 6. API reference (`backend/routes/api.php`)
 
-All under `/api` prefix. Public: `POST /api/login`.
+All under `/api` prefix. Public: `POST /api/login`, `POST /api/support/send`,
+`GET /api/auth/google`, `GET /api/auth/google/callback`.
+
+### Google OAuth (Socialite, stateless)
+
+- `GET /api/auth/google` redirects to Google; `GET /api/auth/google/callback` exchanges the
+  code, then finds the user by `google_id` **or email** (linking an existing account) or
+  creates one with `role_id = 3` (**Receptionist**, hardcoded), a random 16-char password,
+  and the Google avatar.
+- The callback ends with a redirect to `{FRONTEND_URL}/auth/callback?token=<sanctum token>`
+  (`FRONTEND_URL` env, default `http://localhost:5173`). See §10 for the missing frontend
+  handler for this URL.
+
+### Support → Telegram
+
+- `POST /api/support/send` validates `subject` + `message` (plus optional `user_name` /
+  `user_email`) and forwards a formatted message to the Telegram Bot API using
+  `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` env vars. Works for guests too (falls back to
+  "Clinic User" when not authenticated). Returns `{message}` on success, `{error}` + 500 on
+  Telegram failure.
 
 Authenticated (`auth:sanctum`):
 - `GET /api/me`, `PUT /api/profile`, `PUT /api/password`, `POST /api/logout`
@@ -234,6 +265,8 @@ Notes / gotchas:
   records/prescriptions — the UI should soft-deactivate instead.
 - `DoctorController::update` can re-attach an **orphaned** doctor row (its `user_id` was deleted)
   by creating a fresh `User` (default password `doctor7777`).
+- Extra env vars the backend may need: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+  `GOOGLE_REDIRECT_URI`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `FRONTEND_URL`.
 
 ---
 
@@ -248,6 +281,21 @@ Notes / gotchas:
 - `src/layouts/` (`AdminLayout`, `DoctorLayout`, `RoleRoute`) is **dead code** — nothing imports
   it. Don't resurrect it; use the `AppRoutes.jsx` pattern.
 
+### Shared UI kit (`src/components/ui/`)
+
+- Barrel export in `ui/index.js`: `Button`, `PageHeader`, `Card`, `Badge`, `statusTone`,
+  `Field` (+ `TextInput` / `SelectInput` / `TextArea`), `SearchInput`, `Pagination`,
+  `EmptyState`, `Modal`, `Table`.
+- Feature pages (Doctor, Patients, User, Inventory, Billing, Appointments, …) are built on
+  this kit. **Prefer composing these over hand-rolling new buttons/tables/modals/fields.**
+  Check an existing page for the established usage pattern before writing a new one.
+
+### URL-synced search (`src/hooks/useUrlSearch.js`)
+
+- `const [term, setTerm] = useUrlSearch()` keeps a page's search box in sync with the
+  `?search=` query param (default key `"search"`), so the global navbar search can deep-link
+  onto any list page pre-filtered. Use it for new list pages.
+
 ### Pages (`src/pages/`)
 
 `Dashboard`, `Appointments`, `Doctor`, `Patients`, `MedicalRecord`, `Prescription`,
@@ -257,6 +305,12 @@ Notes / gotchas:
 
 Note: `/inventory` and `/billing` are now **full standalone pages** (`Inventory.jsx`,
 `Billing.jsx`) — they no longer simply re-render `Medicine`/`Payment`.
+
+- **Login** also offers "Sign in with Google", which hard-navigates to
+  `http://localhost:8000/api/auth/google` (hardcoded in `Login.jsx` — update it there if the
+  backend host changes).
+- **Support** posts to `/api/support/send`; the backend relays the message to Telegram
+  (previously it opened a `mailto:` link — that path is gone).
 
 ### i18n & locale
 
@@ -351,6 +405,15 @@ npm run lint                    # ESLint
 
 - **Register page exists but no backend register endpoint** — `Register.jsx` has no working
   API to call.
+- **Google OAuth callback has no frontend handler yet.** The backend redirects to
+  `{FRONTEND_URL}/auth/callback?token=...`, but `AppRoutes.jsx` defines no `/auth/callback`
+  route, so the wildcard rule just bounces to `/dashboard` **without storing the token** —
+  Google sign-in currently does not complete a login. A handler page that persists the token
+  (same `localStorage` key `token`) and redirects is still to be built.
+- **Support page depends on Telegram env vars.** If `TELEGRAM_BOT_TOKEN` /
+  `TELEGRAM_CHAT_ID` are missing, `/api/support/send` returns 500.
+- The Login page's Google button hardcodes `http://localhost:8000` (not `127.0.0.1`) and
+  ignores the axios baseURL / locale prefix.
 - **`src/layouts/` is dead code** (`AdminLayout`, `DoctorLayout`, `RoleRoute` are unimported).
   Routing/layout now lives entirely in `src/routes/AppRoutes.jsx`.
 - `AuthContext.jsx` sets `axios.defaults.baseURL` while `services/api.js` uses its own instance

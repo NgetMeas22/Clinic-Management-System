@@ -227,12 +227,19 @@ export default function Doctors() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
+    if (submitting) return;
 
     if (!formData.department_id) {
       alert("Please select a department.");
       return;
     }
+
+    if (!formData.license_number.trim()) {
+      alert("License number is required.");
+      return;
+    }
+
+    setSubmitting(true);
 
     const payload = avatarFile
       ? (() => {
@@ -578,7 +585,7 @@ export default function Doctors() {
             <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={submitting} type="submit" form="doctor-form">
+            <Button disabled={submitting} type="submit" form="doctor-form">
               {submitting ? "Saving…" : editingDoctorId ? "Update Doctor Record" : "Save Doctor Record"}
             </Button>
           </>
@@ -670,10 +677,11 @@ export default function Doctors() {
                   )}
                 </SelectInput>
               </Field>
-              <Field label="License Number">
+              <Field label="License Number" required>
                 <TextInput
                   type="text"
                   name="license_number"
+                  required
                   value={formData.license_number}
                   onChange={handleChange}
                   placeholder="e.g. MD-102938"

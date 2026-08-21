@@ -8,8 +8,9 @@ import {
   Phone,
   Send,
 } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/AuthContext"; // បើក import ឡើងវិញ
 import { useLocale } from "../context/LocaleContext";
+import axios from "../api/axios";
 
 const FAQS = [
   { key: "faqQ1", answer: "faqA1" },
@@ -25,7 +26,7 @@ const QUICK_CHECKS = [
 ];
 
 export default function Support() {
-  const { user } = useAuth();
+  const { user } = useAuth(); // បើកប្រើ user ឡើងវិញ
   const { t } = useLocale();
 
   const [subject, setSubject] = useState("");
@@ -35,7 +36,7 @@ export default function Support() {
   const [error, setError] = useState("");
   const [openFaq, setOpenFaq] = useState(0);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -46,23 +47,25 @@ export default function Support() {
 
     setSending(true);
 
-    const email = "support@ngmclinic.local";
-    const subjectLine = encodeURIComponent(`[Clinic Support] ${subject.trim()}`);
-    const body = encodeURIComponent(
-      `Name: ${user?.name || "N/A"}\nEmail: ${user?.email || "N/A"}\nRole: ${user?.role || "N/A"}\n\n${message.trim()}`
-    );
+    try {
+      // ផ្ញើតិន្នន័យទៅ Backend Laravel ដើម្បីផ្ញើបន្តចូល Telegram
+      await axios.post("/support/send", {
+        subject: subject.trim(),
+        message: message.trim(),
+        user_name: user?.name,
+        user_email: user?.email,
+      });
 
-    // Open the user's email app with the message pre-filled. There is no
-    // backend mail endpoint yet, so this is the reliable, server-free path.
-    window.location.href = `mailto:${email}?subject=${subjectLine}&body=${body}`;
-
-    setTimeout(() => {
-      setSending(false);
       setSent(true);
       setSubject("");
       setMessage("");
-    }, 800);
-  };
+    } catch (err) {
+      console.error(err);
+      setError("មានបញ្ហាក្នុងការផ្ញើសារ! សូមព្យាយាមម្តងទៀត។");
+    } finally {
+      setSending(false);
+    }
+  }; // បិទ handleSubmit ត្រឹមត្រូវ
 
   return (
     <div className="space-y-6">
@@ -204,4 +207,4 @@ export default function Support() {
       </div>
     </div>
   );
-}
+}   
