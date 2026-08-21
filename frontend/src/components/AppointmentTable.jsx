@@ -1,20 +1,10 @@
-import { useMemo } from "react";
-import {
-  Calendar,
-  CalendarDays,
-  Clock,
-  MoreVertical,
-  Pencil,
-  Plus,
-  SlidersHorizontal,
-  Trash2,
-  User,
-} from "lucide-react";
+import { Calendar, CalendarDays, Clock, MoreVertical, Pencil, Plus, SlidersHorizontal, Trash2, User } from "lucide-react";
 import {
   Badge,
   Button,
   Card,
   PageHeader,
+  Pagination,
   SearchInput,
   SelectInput,
 } from "../components/ui";
@@ -22,6 +12,8 @@ import { statusTone } from "../components/ui";
 
 export default function AppointmentsManager({
   appointments = [],
+  meta = { currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 },
+  onPageChange,
   search,
   setSearch,
   status,
@@ -39,30 +31,6 @@ export default function AppointmentsManager({
     const last = lastName ? lastName[0] : "";
     return (first + last).toUpperCase() || "P";
   };
-
-  const filteredAppointments = useMemo(() => {
-    return appointments.filter((item) => {
-      const patientName = `${item.patient?.first_name || ""} ${
-        item.patient?.last_name || ""
-      }`.toLowerCase();
-      const doctorName = (item.doctor?.user?.name || item.doctor?.name || "").toLowerCase();
-      const reason = (item.reason || "").toLowerCase();
-      const status = (item.status || "").toLowerCase();
-      const q = String(search || "").toLowerCase();
-
-      const matchesSearch =
-        patientName.includes(q) ||
-        doctorName.includes(q) ||
-        reason.includes(q);
-
-      const matchesStatus =
-        !statusFilter ||
-        statusFilter === "All Statuses" ||
-        status === String(statusFilter).toLowerCase();
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [appointments, search, statusFilter]);
 
   return (
     <div className="space-y-6">
@@ -127,7 +95,7 @@ export default function AppointmentsManager({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredAppointments.length === 0 ? (
+              {appointments.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-slate-400">
@@ -144,7 +112,7 @@ export default function AppointmentsManager({
                   </td>
                 </tr>
               ) : (
-                filteredAppointments.map((item) => {
+                appointments.map((item) => {
                   const patientName =
                     item.patient?.first_name || item.patient?.last_name
                       ? `${item.patient?.first_name || ""} ${
@@ -267,21 +235,16 @@ export default function AppointmentsManager({
           </table>
         </div>
 
-        {filteredAppointments.length > 0 && (
-          <div className="flex flex-col items-center justify-between gap-2 border-t border-slate-200 px-6 py-4 sm:flex-row dark:border-slate-800">
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              Showing{" "}
-              <span className="font-semibold text-slate-800 dark:text-slate-200">1</span> to{" "}
-              <span className="font-semibold text-slate-800 dark:text-slate-200">
-                {filteredAppointments.length}
-              </span>{" "}
-              of{" "}
-              <span className="font-semibold text-slate-800 dark:text-slate-200">
-                {appointments.length}
-              </span>{" "}
-              entries
-            </div>
-          </div>
+        {appointments.length > 0 && (
+          <Pagination
+            page={meta.currentPage}
+            totalPages={meta.lastPage}
+            onPageChange={onPageChange}
+            from={meta.from}
+            to={meta.to}
+            total={meta.total}
+            label="appointments"
+          />
         )}
       </Card>
     </div>

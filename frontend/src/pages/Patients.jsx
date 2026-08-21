@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Camera,
   Download,
@@ -26,6 +26,7 @@ import {
   Field,
   Modal,
   PageHeader,
+  Pagination,
   SearchInput,
   SelectInput,
   TextInput,
@@ -33,6 +34,7 @@ import {
   statusTone,
 } from "../components/ui";
 import useUrlSearch from "../hooks/useUrlSearch";
+import unwrapPaginator from "../utils/paginate";
 
 const calculateAge = (dob) => {
   if (!dob) return null;
@@ -108,6 +110,8 @@ export default function Patients() {
   const { user } = useAuth();
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 });
 
   const [searchTerm, setSearchTerm] = useUrlSearch();
   const [statusFilter, setStatusFilter] = useState("All Patients");
@@ -130,15 +134,22 @@ export default function Patients() {
 
     const fetchPatients = async () => {
       try {
-        const response = await getPatients();
+        const params = { page, per_page: 10 };
+        if (searchTerm) params.search = searchTerm;
+        if (statusFilter !== "All Patients") params.status = statusFilter;
+
+        const response = await getPatients(params);
         if (isMounted) {
-          const fetchedData =
-            response.data?.data?.data || response.data?.data || response.data || [];
-          setPatients(Array.isArray(fetchedData) ? fetchedData : []);
+          const { items, meta } = unwrapPaginator(response);
+          setPatients(items);
+          setMeta(meta);
         }
       } catch (error) {
         console.error("Error fetching patients:", error);
-        if (isMounted) setPatients([]);
+        if (isMounted) {
+          setPatients([]);
+          setMeta({ currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 });
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -148,7 +159,14 @@ export default function Patients() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [page, searchTerm, statusFilter]);
+
+  const filterKey = `${searchTerm}|${statusFilter}`;
+  const [lastFilterKey, setLastFilterKey] = useState(filterKey);
+  if (lastFilterKey !== filterKey) {
+    setLastFilterKey(filterKey);
+    setPage(1);
+  }
 
   useEffect(() => {
     if (!activeMenuId) return;
@@ -307,35 +325,12 @@ export default function Patients() {
     }
   };
 
-  const filteredPatients = useMemo(() => {
-    return patients.filter((patient) => {
-      const fullName = (
-        patient.name || `${patient.first_name || ""} ${patient.last_name || ""}`
-      ).toLowerCase();
-      const code = (patient.patient_code || `PT-${patient.id}`).toLowerCase();
-      const phone = (patient.phone || "").toLowerCase();
-      const search = searchTerm.toLowerCase();
-
-      const matchesSearch = fullName.includes(search) || code.includes(search) || phone.includes(search);
-      const patientStatus = patient.status || "active";
-      const matchesStatus =
-        statusFilter === "All Patients" || patientStatus.toLowerCase() === statusFilter.toLowerCase();
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [patients, searchTerm, statusFilter]);
-
-  const activeCount = useMemo(
-    () => patients.filter((p) => (p.status || "active").toLowerCase() === "active").length,
-    [patients]
-  );
-
   const exportCsv = () => {
-    if (filteredPatients.length === 0) return;
+    if (patients.length === 0) return;
     const headers = ["ID", "Name", "Gender", "Age", "Phone", "Email", "Status"];
     const csv = [
       headers.join(","),
-      ...filteredPatients.map((p) =>
+      ...patients.map((p) =>
         [
           p.patient_code || p.id,
           `${p.first_name || ""} ${p.last_name || ""}`.trim(),
@@ -365,7 +360,7 @@ export default function Patients() {
       <PageHeader
         icon={Users}
         title="Patients"
-        subtitle={`${patients.length} total · ${activeCount} active`}
+        subtitle={`${meta.total} total`}
         actions={
           canCreate && (
             <Button onClick={handleOpenAddModal}>
@@ -442,7 +437,7 @@ export default function Patients() {
                     ))}
                   </tr>
                 ))
-              ) : filteredPatients.length === 0 ? (
+              ) : patients.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-slate-400">
@@ -453,7 +448,7 @@ export default function Patients() {
                   </td>
                 </tr>
               ) : (
-                filteredPatients.map((patient) => {
+                patients.map((patient) => {
                   const fullName =
                     patient.name ||
                     `${patient.first_name || ""} ${patient.last_name || ""}`.trim() ||
@@ -551,6 +546,15 @@ export default function Patients() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          page={meta.currentPage}
+          totalPages={meta.lastPage}
+          onPageChange={setPage}
+          from={meta.from}
+          to={meta.to}
+          total={meta.total}
+          label="patients"
+        />
       </Card>
 
       <Modal

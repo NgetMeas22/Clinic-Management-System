@@ -15,10 +15,29 @@ class DepartmentController extends Controller
     /**
      * GET /api/departments
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $departments = Department::latest()->paginate(10);
+            $perPage = min(max((int) $request->query('per_page', 10), 1), 200);
+
+            $query = Department::query()
+                ->select(['id', 'name', 'description', 'status', 'created_at']);
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+
+            $departments = $query
+                ->latest()
+                ->paginate($perPage);
 
             return response()->json([
                 'success' => true,
@@ -78,7 +97,7 @@ class DepartmentController extends Controller
     {
         try {
             $department = Department::findOrFail($id);
-
+ 
             return response()->json([
                 'success' => true,
                 'message' => 'Department retrieved successfully',

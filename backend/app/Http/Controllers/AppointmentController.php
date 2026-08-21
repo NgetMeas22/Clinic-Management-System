@@ -32,10 +32,18 @@ class AppointmentController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Appointment::with([
-                'patient',
-                'doctor.user'
-            ]);
+            $perPage = min(max((int) $request->query('per_page', 10), 1), 200);
+
+            $query = Appointment::query()
+                ->select([
+                    'id', 'patient_id', 'doctor_id', 'appointment_date', 'appointment_time',
+                    'reason', 'status', 'notes', 'created_at',
+                ])
+                ->with([
+                    'patient:id,first_name,last_name,patient_code,gender,date_of_birth,phone,email,profile_picture',
+                    'doctor:id,user_id,department_id,specialization',
+                    'doctor.user:id,name,email,phone,avatar',
+                ]);
 
             // Search
             if ($request->filled('search')) {
@@ -58,7 +66,7 @@ class AppointmentController extends Controller
                 if (!$doctorId) {
                     return response()->json([
                         'success' => true,
-                        'data' => Appointment::query()->where('id', 0)->paginate(10),
+                        'data' => Appointment::query()->where('id', 0)->paginate($perPage),
                     ], 200);
                 }
 
@@ -67,7 +75,7 @@ class AppointmentController extends Controller
 
             $appointments = $query
                 ->latest()
-                ->paginate(10);
+                ->paginate($perPage);
 
             return response()->json([
                 'success' => true,

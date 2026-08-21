@@ -63,6 +63,12 @@ export const AuthProvider = ({ children }) => {
     return user;
   };
 
+  const loginWithToken = useCallback((newToken) => {
+    localStorage.setItem('token', newToken);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+    setToken(newToken);
+  }, []);
+
   const updateProfile = async (data) => {
     const res = data instanceof FormData
       ? await axios.post('/profile', (() => {
@@ -82,7 +88,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, updateProfile, changePassword }}>
+    <AuthContext.Provider value={{ user, token, login, loginWithToken, logout, loading, updateProfile, changePassword }}>
       {children}
     </AuthContext.Provider>
   );

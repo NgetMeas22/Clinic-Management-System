@@ -15,15 +15,23 @@ class MedicineController extends Controller
  */
 public function index(Request $request)
 {
-    $query = Medicine::query();
+    $query = Medicine::query()
+        ->select([
+            'id', 'name', 'category', 'description', 'quantity',
+            'unit', 'price', 'expiry_date', 'status', 'created_at',
+        ]);
 
     if ($request->has('search')) {
         $search = $request->get('search');
-        $query->where('name', 'like', "%{$search}%")
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
               ->orWhere('category', 'like', "%{$search}%");
+        });
     }
 
-    $medicines = $query->get();
+    $perPage = min(max((int) $request->query('per_page', 10), 1), 200);
+
+    $medicines = $query->latest()->paginate($perPage);
 
     return response()->json([
         'success' => true,

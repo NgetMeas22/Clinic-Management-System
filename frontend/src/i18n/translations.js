@@ -124,6 +124,7 @@ export const translations = {
     "login.forgotNotAvailable": "Password reset is not available yet. Contact an administrator.",
     "login.needAccount": "Need an account?",
     "login.registerAsStaff": "Register as Staff",
+    "auth.googleSigningIn": "Completing Google sign-in…",
   },
 
   km: {
@@ -251,5 +252,6 @@ export const translations = {
     "login.forgotNotAvailable": "ការកំណត់ពាក្យសម្ងាត់ឡើងវិញមិនទាន់មានទេ។ សូមទាក់ទងអ្នកគ្រប់គ្រង។",
     "login.needAccount": "ត្រូវការគណនី?",
     "login.registerAsStaff": "ចុះឈ្មោះជាបុគ្គលិក",
+    "auth.googleSigningIn": "កំពុងបញ្ចប់ការចូលដោយ Google…",
   },
 };

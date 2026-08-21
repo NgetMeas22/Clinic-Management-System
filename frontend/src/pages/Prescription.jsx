@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { CheckCircle2, ClipboardList, Pill, Plus, User } from "lucide-react";
 import prescriptionService from "../services/prescriptionService";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../utils/permissions";
 import PrescriptionFormModal from "../components/PrescriptionFormModal";
-import { Button, Card, PageHeader, SearchInput } from "../components/ui";
+import { Button, Card, PageHeader, Pagination, SearchInput } from "../components/ui";
 import useUrlSearch from "../hooks/useUrlSearch";
+import unwrapPaginator from "../utils/paginate";
 
 const formatDate = (value) => {
   if (!value) return "N/A";
@@ -25,33 +26,40 @@ const Prescriptions = () => {
   const [query, setQuery] = useUrlSearch();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 });
 
   const canCreate = can(user, "prescriptions", "create");
 
-  const fetchPrescriptions = async () => {
+  const fetchPrescriptions = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      const response = await prescriptionService.getAll();
-      const data = response.data?.data?.data || response.data?.data || response.data || [];
-      setPrescriptions(Array.isArray(data) ? data : []);
+      const params = { page, per_page: 8 };
+      if (query) params.search = query;
+
+      const response = await prescriptionService.getAll(params);
+      const { items, meta } = unwrapPaginator(response);
+      setPrescriptions(items);
+      setMeta(meta);
     } catch (err) {
       console.error("Failed to load prescriptions:", err);
       setError("We couldn't load prescriptions. Please try refreshing the page.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, query]);
 
   useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      if (isMounted) await fetchPrescriptions();
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch sets loading state
+    fetchPrescriptions();
+  }, [fetchPrescriptions]);
+
+  const [lastQuery, setLastQuery] = useState(query);
+  if (lastQuery !== query) {
+    setLastQuery(query);
+    setPage(1);
+  }
 
   useEffect(() => {
     if (!toast) return;
@@ -63,23 +71,6 @@ const Prescriptions = () => {
     setToast("Prescription created successfully.");
     await fetchPrescriptions();
   };
-
-  const filtered = useMemo(() => {
-    if (!query.trim()) return prescriptions;
-    const q = query.trim().toLowerCase();
-    return prescriptions.filter((p) => {
-      const patientName = `${p.patient?.first_name || ""} ${p.patient?.last_name || ""}`.toLowerCase();
-      const medicineNames = (p.items || [])
-        .map((it) => it.medicine?.name || "")
-        .join(" ")
-        .toLowerCase();
-      return (
-        patientName.includes(q) ||
-        medicineNames.includes(q) ||
-        String(p.id).includes(q)
-      );
-    });
-  }, [prescriptions, query]);
 
   return (
     <div className="space-y-6">
@@ -135,9 +126,10 @@ const Prescriptions = () => {
             </Card>
           ))}
         </div>
-      ) : filtered.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {filtered.map((prescription) => {
+      ) : prescriptions.length > 0 ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            {prescriptions.map((prescription) => {
             const patientName = prescription.patient
               ? `${prescription.patient.first_name || ""} ${prescription.patient.last_name || ""}`.trim()
               : "Unknown patient";
@@ -224,7 +216,17 @@ const Prescriptions = () => {
               </Card>
             );
           })}
-        </div>
+          </div>
+          <Pagination
+            page={meta.currentPage}
+            totalPages={meta.lastPage}
+            onPageChange={setPage}
+            from={meta.from}
+            to={meta.to}
+            total={meta.total}
+            label="prescriptions"
+          />
+        </>
       ) : (
         <Card padded className="py-16 text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">

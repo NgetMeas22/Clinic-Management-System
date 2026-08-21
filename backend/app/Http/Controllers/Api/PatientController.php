@@ -31,9 +31,20 @@ class PatientController extends Controller
                 });
             }
 
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+
+            $perPage = min(max((int) $request->query('per_page', 10), 1), 200);
+
             $patients = $query
+                ->select([
+                    'id', 'patient_code', 'first_name', 'last_name', 'gender',
+                    'date_of_birth', 'blood_group', 'phone', 'email', 'profile_picture',
+                    'address', 'emergency_contact', 'emergency_phone', 'status', 'created_at',
+                ])
                 ->latest()
-                ->paginate(10);
+                ->paginate($perPage);
 
             return response()->json([
                 'success' => true,

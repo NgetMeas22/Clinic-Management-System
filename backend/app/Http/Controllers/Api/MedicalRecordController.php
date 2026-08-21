@@ -28,12 +28,22 @@ class MedicalRecordController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = MedicalRecord::with([
-                'patient',
-                'doctor.user',
-                'appointment',
-                'prescriptions.items.medicine'
-            ]);
+            $perPage = min(max((int) $request->query('per_page', 10), 1), 200);
+
+            $query = MedicalRecord::query()
+                ->select([
+                    'id', 'patient_id', 'doctor_id', 'appointment_id',
+                    'symptoms', 'diagnosis', 'treatment', 'notes', 'created_at',
+                ])
+                ->with([
+                    'patient:id,first_name,last_name,patient_code,gender,date_of_birth,phone,profile_picture',
+                    'doctor:id,user_id,specialization',
+                    'doctor.user:id,name,email,avatar',
+                    'appointment:id,patient_id,doctor_id,appointment_date,appointment_time,status',
+                    'prescriptions:id,medical_record_id,prescription_date,notes',
+                    'prescriptions.items:id,prescription_id,medicine_id,quantity,dosage,frequency,duration,instruction',
+                    'prescriptions.items.medicine:id,name,category,unit,price',
+                ]);
 
             if ($request->filled('patient_id')) {
                 $query->where('patient_id', $request->patient_id);
@@ -43,13 +53,31 @@ class MedicalRecordController extends Controller
                 $query->where('doctor_id', $request->doctor_id);
             }
 
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('diagnosis', 'like', "%{$search}%")
+                        ->orWhereHas('patient', function ($p) use ($search) {
+                            $p->where('first_name', 'like', "%{$search}%")
+                                ->orWhere('last_name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('doctor.user', function ($d) use ($search) {
+                            $d->where('name', 'like', "%{$search}%");
+                        });
+                });
+            }
+
+            if ($request->filled('diagnosis')) {
+                $query->where('diagnosis', $request->diagnosis);
+            }
+
             if ($this->isDoctor($request)) {
                 $doctorId = $this->doctorId($request);
 
                 if (!$doctorId) {
                     return response()->json([
                         'success' => true,
-                        'data' => MedicalRecord::query()->where('id', 0)->paginate(10),
+                        'data' => MedicalRecord::query()->where('id', 0)->paginate($perPage),
                     ], 200);
                 }
 
@@ -58,7 +86,7 @@ class MedicalRecordController extends Controller
 
             $records = $query
                 ->latest()
-                ->paginate(10);
+                ->paginate($perPage);
 
             return response()->json([
                 'success' => true,

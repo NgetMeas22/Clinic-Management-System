@@ -69,9 +69,9 @@ const PrescriptionFormModal = ({ open, onClose, onCreated }) => {
       try {
         setLoadingLookups(true);
         const [patientsRes, doctorsRes, medicinesRes] = await Promise.all([
-          getPatients(),
-          getDoctors(),
-          medicineService.getAll(),
+          getPatients({ per_page: 200 }),
+          getDoctors({ per_page: 200 }),
+          medicineService.getAll({ per_page: 200 }),
         ]);
 
         const unwrap = (res) => res.data?.data?.data || res.data?.data || res.data || [];

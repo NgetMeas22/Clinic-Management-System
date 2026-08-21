@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   BadgeCheck,
   Camera,
@@ -28,6 +28,7 @@ import {
   Field,
   Modal,
   PageHeader,
+  Pagination,
   SearchInput,
   SelectInput,
   TextArea,
@@ -35,11 +36,14 @@ import {
   statusTone,
 } from "../components/ui";
 import useUrlSearch from "../hooks/useUrlSearch";
+import unwrapPaginator from "../utils/paginate";
 
 export default function Doctors() {
   const { user } = useAuth();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 });
 
   const [searchTerm, setSearchTerm] = useUrlSearch();
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
@@ -57,8 +61,8 @@ export default function Doctors() {
     let isMounted = true;
     const loadDepartments = async () => {
       try {
-        const response = await api.get("/departments");
-        const items = response.data?.data?.data || response.data?.data || response.data || [];
+        const response = await api.get("/departments", { params: { per_page: 200 } });
+        const { items } = unwrapPaginator(response);
         const depts = Array.isArray(items) ? items : [];
         if (isMounted) {
           setDepartmentList(depts.map((d) => ({ id: d.id, name: d.name })));
@@ -134,15 +138,27 @@ export default function Doctors() {
 
     const fetchDoctors = async () => {
       try {
-        const response = await getDoctors();
+        const params = { page, per_page: 10 };
+        if (searchTerm) params.search = searchTerm;
+        if (selectedDepartment !== "All Departments") {
+          const dept = departmentList.find(
+            (d) => d.name.toLowerCase() === selectedDepartment.toLowerCase()
+          );
+          if (dept) params.department_id = dept.id;
+        }
+
+        const response = await getDoctors(params);
         if (isMounted) {
-          const fetchedData =
-            response.data?.data?.data || response.data?.data || response.data || [];
-          setDoctors(Array.isArray(fetchedData) ? fetchedData : []);
+          const { items, meta } = unwrapPaginator(response);
+          setDoctors(items);
+          setMeta(meta);
         }
       } catch (error) {
         console.error("Error fetching doctors:", error);
-        if (isMounted) setDoctors([]);
+        if (isMounted) {
+          setDoctors([]);
+          setMeta({ currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 });
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -153,7 +169,14 @@ export default function Doctors() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [page, searchTerm, selectedDepartment, departmentList]);
+
+  const filterKey = `${searchTerm}|${selectedDepartment}`;
+  const [lastFilterKey, setLastFilterKey] = useState(filterKey);
+  if (lastFilterKey !== filterKey) {
+    setLastFilterKey(filterKey);
+    setPage(1);
+  }
 
   useEffect(() => {
     if (!activeMenuId) return;
@@ -316,36 +339,14 @@ export default function Doctors() {
     }
   };
 
-  const filteredDoctors = useMemo(() => {
-    return doctors.filter((doc) => {
-      const name = (doc.user?.name || doc.name || doc.full_name || "").toLowerCase();
-      const code = (doc.doctor_code || doc.code || (doc.id ? `DOC-${4090 + doc.id}` : "")).toLowerCase();
-      const specialization = (doc.specialization || doc.speciality || "").toLowerCase();
-      const department = getDepartmentName(doc).toLowerCase();
-      const search = searchTerm.toLowerCase();
-
-      const matchesSearch =
-        name.includes(search) ||
-        code.includes(search) ||
-        specialization.includes(search) ||
-        department.includes(search);
-
-      const matchesDepartment =
-        selectedDepartment === "All Departments" ||
-        department === selectedDepartment.toLowerCase();
-
-      return matchesSearch && matchesDepartment;
-    });
-  }, [doctors, searchTerm, selectedDepartment]);
-
   const activeCount = doctors.filter((d) => (d.status || "active").toLowerCase() === "active").length;
 
   const exportCsv = () => {
-    if (filteredDoctors.length === 0) return;
+    if (doctors.length === 0) return;
     const headers = ["Name", "Specialization", "Department", "Status"];
     const csv = [
       headers.join(","),
-      ...filteredDoctors.map((doc) =>
+      ...doctors.map((doc) =>
         [
           doc.user?.name || doc.name || "",
           doc.specialization || doc.speciality || "",
@@ -390,7 +391,7 @@ export default function Doctors() {
           </div>
           <div>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Total doctors</p>
-            <p className="text-lg font-bold text-slate-900 dark:text-white">{doctors.length}</p>
+            <p className="text-lg font-bold text-slate-900 dark:text-white">{meta.total}</p>
           </div>
         </Card>
         <Card padded className="flex items-center gap-3">
@@ -479,7 +480,7 @@ export default function Doctors() {
                     ))}
                   </tr>
                 ))
-              ) : filteredDoctors.length === 0 ? (
+              ) : doctors.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-slate-400">
@@ -489,7 +490,7 @@ export default function Doctors() {
                   </td>
                 </tr>
               ) : (
-                filteredDoctors.map((doc) => {
+                doctors.map((doc) => {
                   const name = doc.user?.name || doc.name || doc.full_name || "Dr. Unknown";
                   const code = doc.doctor_code || doc.code || `DOC-${4090 + doc.id}`;
                   const specialization = doc.specialization || doc.speciality || "General Practitioner";
@@ -567,6 +568,15 @@ export default function Doctors() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          page={meta.currentPage}
+          totalPages={meta.lastPage}
+          onPageChange={setPage}
+          from={meta.from}
+          to={meta.to}
+          total={meta.total}
+          label="doctors"
+        />
       </Card>
 
       <Modal

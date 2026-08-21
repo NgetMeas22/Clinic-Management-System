@@ -15,6 +15,7 @@ import { getDoctors } from "../services/doctorService";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../utils/permissions";
 import useUrlSearch from "../hooks/useUrlSearch";
+import unwrapPaginator from "../utils/paginate";
 
 /* eslint-disable react-hooks/set-state-in-effect */
 
@@ -23,6 +24,8 @@ const Appointments = () => {
     const [appointments, setAppointments] = useState([]);
     const [patients, setPatients] = useState([]);
     const [doctors, setDoctors] = useState([]);
+    const [page, setPage] = useState(1);
+    const [meta, setMeta] = useState({ currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 });
 
     const [search, setSearch] = useUrlSearch();
     const [status, setStatus] = useState("");
@@ -37,17 +40,26 @@ const Appointments = () => {
 
     const loadAppointments = useCallback(async () => {
         try {
-            const response = await getAppointments({ search: search || undefined, status: status || undefined });
-            setAppointments(response.data?.data?.data || response.data?.data || []);
+            const response = await getAppointments({
+                page,
+                per_page: 10,
+                search: search || undefined,
+                status: status || undefined,
+            });
+            const { items, meta } = unwrapPaginator(response);
+            setAppointments(items);
+            setMeta(meta);
         } catch (error) {
             console.error("Failed to load appointments:", error);
+            setAppointments([]);
+            setMeta({ currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 });
         }
-    }, [search, status]);
+    }, [page, search, status]);
 
     const loadPatients = async () => {
         try {
-            const response = await getPatients();
-            setPatients(response.data?.data?.data || response.data?.data || []);
+            const response = await getPatients({ per_page: 200 });
+            setPatients(unwrapPaginator(response).items);
         } catch (error) {
             console.error("Failed to load patients:", error);
         }
@@ -55,8 +67,8 @@ const Appointments = () => {
 
     const loadDoctors = async () => {
         try {
-            const response = await getDoctors();
-            setDoctors(response.data?.data?.data || response.data?.data || []);
+            const response = await getDoctors({ per_page: 200 });
+            setDoctors(unwrapPaginator(response).items);
         } catch (error) {
             console.error("Failed to load doctors:", error);
         }
@@ -70,6 +82,10 @@ const Appointments = () => {
     useEffect(() => {
         loadAppointments();
     }, [loadAppointments]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [search, status]);
 
     const handleCreate = () => {
         setSelectedAppointment(null);
@@ -129,6 +145,8 @@ const Appointments = () => {
         <div className="w-full">
             <AppointmentTable
                 appointments={appointments}
+                meta={meta}
+                onPageChange={setPage}
                 search={search}
                 setSearch={setSearch}
                 status={status}

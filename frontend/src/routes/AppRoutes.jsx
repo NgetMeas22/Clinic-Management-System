@@ -16,6 +16,7 @@ import Sidebar from "../components/common/layout/Sidebar";
 
 import Login from "../pages/Auth/Login";
 import Register from "../pages/Auth/Register";
+import GoogleCallback from "../pages/Auth/GoogleCallback";
 
 import Dashboard from "../pages/Dashboard";
 import Appointments from "../pages/Appointments";
@@ -117,6 +118,7 @@ export default function AppRoutes() {
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/auth/callback" element={<GoogleCallback />} />
       <Route path="/403" element={<Unauthorized />} />
       {renderProtected()}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -125,6 +127,7 @@ export default function AppRoutes() {
         <Route index element={<Navigate to="/en/dashboard" replace />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
+        <Route path="auth/callback" element={<GoogleCallback />} />
         <Route path="403" element={<Unauthorized />} />
         {renderProtected()}
         <Route path="*" element={<Navigate to="/en/dashboard" replace />} />

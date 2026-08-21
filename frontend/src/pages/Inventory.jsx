@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   AlertTriangle,
   Boxes,
@@ -26,6 +26,7 @@ import {
   TextInput,
 } from "../components/ui";
 import useUrlSearch from "../hooks/useUrlSearch";
+import unwrapPaginator from "../utils/paginate";
 
 const currency = (n) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(n || 0));
@@ -69,6 +70,7 @@ const Inventory = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 });
   const pageSize = 8;
 
   const [showModal, setShowModal] = useState(false);
@@ -84,52 +86,46 @@ const Inventory = () => {
   const canUpdate = can(user, "medicines", "update");
   const canDelete = can(user, "medicines", "delete");
 
-  const loadMedicines = async () => {
+  const loadMedicines = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      const response = await medicineService.getAll({ search: search || undefined });
-      setMedicines(response?.data || []);
+      const response = await medicineService.getAll({
+        page,
+        per_page: pageSize,
+        search: search || undefined,
+      });
+      const { items, meta } = unwrapPaginator(response);
+      setMedicines(items);
+      setMeta(meta);
     } catch (err) {
       console.error("Failed to load medicines:", err);
       setError("We couldn’t load the inventory. Try refreshing the page.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
       loadMedicines();
     }, 300);
     return () => clearTimeout(handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [loadMedicines]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: reset pagination on new search
     setPage(1);
   }, [search]);
 
-  const stats = useMemo(() => {
-    const total = medicines.length;
-    const lowStockCount = medicines.filter((m) => isLowStock(m.quantity)).length;
-    const expiredCount = medicines.filter((m) => isExpired(m.expiry_date)).length;
-    return { total, lowStockCount, expiredCount };
-  }, [medicines]);
-
-  const filteredMedicines = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return medicines;
-    return medicines.filter(
-      (m) =>
-        (m.name || "").toLowerCase().includes(term) ||
-        (m.category || "").toLowerCase().includes(term)
-    );
-  }, [medicines, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredMedicines.length / pageSize));
-  const pagedMedicines = filteredMedicines.slice((page - 1) * pageSize, page * pageSize);
+  const stats = useMemo(
+    () => ({
+      total: meta.total,
+      lowStockCount: medicines.filter((m) => isLowStock(m.quantity)).length,
+      expiredCount: medicines.filter((m) => isExpired(m.expiry_date)).length,
+    }),
+    [medicines, meta]
+  );
 
   const openAdd = () => {
     setEditing(null);
@@ -276,8 +272,8 @@ const Inventory = () => {
                     ))}
                   </tr>
                 ))
-              ) : pagedMedicines.length > 0 ? (
-                pagedMedicines.map((medicine) => {
+              ) : medicines.length > 0 ? (
+                medicines.map((medicine) => {
                   const expired = isExpired(medicine.expiry_date);
                   const lowStock = isLowStock(medicine.quantity);
                   return (
@@ -359,14 +355,14 @@ const Inventory = () => {
           </table>
         </div>
 
-        {!loading && filteredMedicines.length > 0 && (
+        {!loading && medicines.length > 0 && (
           <Pagination
-            page={page}
-            totalPages={totalPages}
+            page={meta.currentPage}
+            totalPages={meta.lastPage}
             onPageChange={setPage}
-            from={(page - 1) * pageSize + 1}
-            to={Math.min(page * pageSize, filteredMedicines.length)}
-            total={filteredMedicines.length}
+            from={meta.from}
+            to={meta.to}
+            total={meta.total}
             label="items"
           />
         )}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Building2, Pencil, Plus, Trash2, Inbox } from "lucide-react";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -19,6 +19,7 @@ import {
   statusTone,
 } from "../components/ui";
 import useUrlSearch from "../hooks/useUrlSearch";
+import unwrapPaginator from "../utils/paginate";
 
 const emptyForm = { name: "", description: "", status: "active" };
 const ITEMS_PER_PAGE = 6;
@@ -37,20 +38,26 @@ export default function Departments() {
   const [searchQuery, setSearchQuery] = useUrlSearch();
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [meta, setMeta] = useState({ currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 });
 
   const loadDepartments = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get("/departments");
-      const items = response.data?.data?.data || response.data?.data || response.data || [];
-      setDepartments(Array.isArray(items) ? items : []);
+      const params = { page: currentPage, per_page: ITEMS_PER_PAGE };
+      if (searchQuery) params.search = searchQuery;
+      if (statusFilter !== "all") params.status = statusFilter;
+
+      const response = await api.get("/departments", { params });
+      const { items, meta } = unwrapPaginator(response);
+      setDepartments(items);
+      setMeta(meta);
     } catch (err) {
       console.error("Failed to load departments", err);
       setError("Departments could not be loaded.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPage, searchQuery, statusFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -59,23 +66,6 @@ export default function Departments() {
 
     return () => clearTimeout(timer);
   }, [loadDepartments]);
-
-  const filteredDepartments = useMemo(() => {
-    return departments.filter((dept) => {
-      const matchesSearch =
-        !searchQuery ||
-        dept.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        dept.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === "all" || dept.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [departments, searchQuery, statusFilter]);
-
-  const totalPages = Math.ceil(filteredDepartments.length / ITEMS_PER_PAGE) || 1;
-  const paginatedDepartments = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredDepartments.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredDepartments, currentPage]);
 
   const handleOpenAddModal = () => {
     setError("");
@@ -191,7 +181,7 @@ export default function Departments() {
           </div>
           <div>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Total departments</p>
-            <p className="text-lg font-bold text-slate-900 dark:text-white">{departments.length}</p>
+            <p className="text-lg font-bold text-slate-900 dark:text-white">{meta.total}</p>
           </div>
         </Card>
         <Card padded className="flex items-center gap-3">
@@ -250,7 +240,7 @@ export default function Departments() {
 
       <Table
         loading={loading}
-        rows={paginatedDepartments}
+        rows={departments}
         rowKey={(row) => row.id || row._id}
         columns={[
           { key: "name", header: "Department Name" },
@@ -301,12 +291,12 @@ export default function Departments() {
       />
 
       <Pagination
-        page={currentPage}
-        totalPages={totalPages}
+        page={meta.currentPage}
+        totalPages={meta.lastPage}
         onPageChange={setCurrentPage}
-        from={filteredDepartments.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0}
-        to={Math.min(currentPage * ITEMS_PER_PAGE, filteredDepartments.length)}
-        total={filteredDepartments.length}
+        from={meta.from}
+        to={meta.to}
+        total={meta.total}
         label="departments"
       />
 

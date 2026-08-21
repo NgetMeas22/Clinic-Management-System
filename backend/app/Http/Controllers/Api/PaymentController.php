@@ -29,10 +29,19 @@ class PaymentController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Payment::with([
-                'patient',
-                'appointment.doctor.user',
-            ]);
+            $perPage = min(max((int) $request->query('per_page', 10), 1), 200);
+
+            $query = Payment::query()
+                ->select([
+                    'id', 'patient_id', 'appointment_id', 'amount', 'payment_method',
+                    'payment_status', 'transaction_code', 'payment_date', 'notes', 'created_at',
+                ])
+                ->with([
+                    'patient:id,first_name,last_name,patient_code,phone',
+                    'appointment:id,patient_id,doctor_id,appointment_date,appointment_time,status',
+                    'appointment.doctor:id,user_id,specialization',
+                    'appointment.doctor.user:id,name,email,avatar',
+                ]);
 
             if ($request->filled('patient_id')) {
                 $query->where(
@@ -62,9 +71,23 @@ class PaymentController extends Controller
                 );
             }
 
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas('patient', function ($p) use ($search) {
+                        $p->where('first_name', 'like', "%{$search}%")
+                            ->orWhere('last_name', 'like', "%{$search}%");
+                    })->orWhere('transaction_code', 'like', "%{$search}%");
+
+                    if (is_numeric($search)) {
+                        $q->orWhere('appointment_id', (int) $search);
+                    }
+                });
+            }
+
             $payments = $query
                 ->latest()
-                ->paginate(10);
+                ->paginate($perPage);
 
             return response()->json([
                 'success' => true,

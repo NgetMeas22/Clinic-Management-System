@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Check, Clock, CreditCard, DollarSign, Receipt, Trash2, Wallet, X } from "lucide-react";
 import paymentService from "../services/paymentService";
 import { getPatients } from "../services/patientService";
@@ -20,6 +20,7 @@ import {
   statusTone,
 } from "../components/ui";
 import useUrlSearch from "../hooks/useUrlSearch";
+import unwrapPaginator from "../utils/paginate";
 
 const currency = (n) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(n || 0));
@@ -76,6 +77,7 @@ const Billing = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 });
   const pageSize = 8;
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -93,70 +95,38 @@ const Billing = () => {
   const canCreate = can(user, "payments", "create");
   const canDelete = can(user, "payments", "delete");
 
-  const loadPayments = async () => {
+  const loadPayments = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
       const response = await paymentService.getAll({
+        page,
+        per_page: pageSize,
         payment_status: status || undefined,
         search: search || undefined,
       });
-      setPayments(response.data?.data || []);
+      const { items, meta } = unwrapPaginator(response);
+      setPayments(items);
+      setMeta(meta);
     } catch (err) {
       console.error("Failed to load payments:", err);
       setError("We couldn't load payments. Try refreshing the page.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, status, search]);
 
   useEffect(() => {
-    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch sets loading state
+    loadPayments();
+  }, [loadPayments]);
 
-    (async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const response = await paymentService.getAll({
-          payment_status: status || undefined,
-          search: search || undefined,
-        });
-        if (!cancelled) {
-          setPayments(response.data?.data || []);
-        }
-      } catch (err) {
-        console.error("Failed to load payments:", err);
-        if (!cancelled) {
-          setError("We couldn't load payments. Try refreshing the page.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [status, search]);
-
-  useEffect(() => {
-    // eslint-disable-next-line -- intentional: only local UI state reset, no data fetching/side effects
+  const filterKey = `${search}|${status}`;
+  const [lastFilterKey, setLastFilterKey] = useState(filterKey);
+  if (lastFilterKey !== filterKey) {
+    setLastFilterKey(filterKey);
     setPage(1);
-  }, [status, search]);
-
-  const filteredPayments = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return payments;
-    return payments.filter((p) => {
-      const name = `${p.patient?.first_name || ""} ${p.patient?.last_name || ""}`.toLowerCase();
-      return name.includes(term) || String(p.appointment_id || "").includes(term);
-    });
-  }, [payments, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredPayments.length / pageSize));
-  const pagedPayments = filteredPayments.slice((page - 1) * pageSize, page * pageSize);
+  }
 
   const stats = useMemo(() => {
     const paid = payments.filter((p) => p.payment_status?.toLowerCase() === "paid");
@@ -195,12 +165,11 @@ const Billing = () => {
     try {
       setLoadingLookups(true);
       const [patientsRes, appointmentsRes] = await Promise.all([
-        getPatients(),
-        getAppointments(),
+        getPatients({ per_page: 200 }),
+        getAppointments({ per_page: 200 }),
       ]);
-      const unwrap = (res) => res.data?.data?.data || res.data?.data || res.data || [];
-      setPatients(Array.isArray(unwrap(patientsRes)) ? unwrap(patientsRes) : []);
-      setAppointments(Array.isArray(unwrap(appointmentsRes)) ? unwrap(appointmentsRes) : []);
+      setPatients(unwrapPaginator(patientsRes).items);
+      setAppointments(unwrapPaginator(appointmentsRes).items);
     } catch (err) {
       console.error("Failed to load billing options:", err);
       setFormError("Couldn't load patients and appointments. Try again.");
@@ -332,8 +301,8 @@ const Billing = () => {
                     ))}
                   </tr>
                 ))
-              ) : pagedPayments.length > 0 ? (
-                pagedPayments.map((payment) => (
+              ) : payments.length > 0 ? (
+                payments.map((payment) => (
                   <tr key={payment.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
                     <td className="p-3.5">
                       <div className="flex items-center gap-2.5">
@@ -406,14 +375,14 @@ const Billing = () => {
           </table>
         </div>
 
-        {!loading && filteredPayments.length > 0 && (
+        {!loading && payments.length > 0 && (
           <Pagination
-            page={page}
-            totalPages={totalPages}
+            page={meta.currentPage}
+            totalPages={meta.lastPage}
             onPageChange={setPage}
-            from={(page - 1) * pageSize + 1}
-            to={Math.min(page * pageSize, filteredPayments.length)}
-            total={filteredPayments.length}
+            from={meta.from}
+            to={meta.to}
+            total={meta.total}
             label="payments"
           />
         )}

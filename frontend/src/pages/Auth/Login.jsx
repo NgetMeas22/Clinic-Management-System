@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useLocale } from "../../context/LocaleContext";
 import LanguageSwitcher from "../../components/LanguageSwitcher";
+import api from "../../api/axios";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function Login() {
@@ -37,7 +38,7 @@ export default function Login() {
 
   // Function សម្រាប់ Redirect ទៅ Google OAuth2 Backend Endpoint
   const handleGoogleLogin = () => {
-    window.location.href = "http://localhost:8000/api/auth/google";
+    window.location.href = `${api.defaults.baseURL}/auth/google`;
   };
 
   return (

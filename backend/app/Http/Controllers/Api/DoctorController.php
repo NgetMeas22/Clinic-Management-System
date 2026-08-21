@@ -21,7 +21,13 @@ class DoctorController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Doctor::with(['user', 'department']);
+            $query = Doctor::with([
+                'user:id,name,email,phone,avatar,status',
+                'department:id,name,status',
+            ])->select([
+                'id', 'user_id', 'department_id', 'specialization', 'license_number',
+                'gender', 'date_of_birth', 'address', 'profile_picture', 'status', 'created_at',
+            ]);
 
             if ($request->filled('search')) {
                 $search = $request->search;
@@ -33,9 +39,15 @@ class DoctorController extends Controller
                 });
             }
 
+            if ($request->filled('department_id')) {
+                $query->where('department_id', $request->department_id);
+            }
+
+            $perPage = min(max((int) $request->query('per_page', 10), 1), 200);
+
             $doctors = $query
                 ->latest()
-                ->paginate(10);
+                ->paginate($perPage);
 
             return response()->json([
                 'success' => true,

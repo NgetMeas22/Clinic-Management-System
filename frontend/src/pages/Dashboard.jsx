@@ -46,6 +46,7 @@ import paymentService from "../services/paymentService";
 import { getAppointments } from "../services/appointmentService";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../utils/permissions";
+import unwrapPaginator from "../utils/paginate";
 
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -379,20 +380,20 @@ export default function Dashboard() {
         dashboardService.getDashboard(),
         dashboardService.getMonthly(),
         dashboardService.getWeekly(),
-        medicineService.getAll(),
-        getAppointments(),
+        medicineService.getAll({ per_page: 200 }),
+        getAppointments({ per_page: 200 }),
       ];
-      if (canViewPayments) requests.push(paymentService.getAll());
+      if (canViewPayments) requests.push(paymentService.getAll({ per_page: 200 }));
 
       const [dashboardRes, yearlyRes, weeklyRes, medicineRes, apptRes, paymentRes] =
         await Promise.all(requests);
 
       setStats(dashboardRes.data || {});
-      setMedicines(medicineRes.data || []);
+      setMedicines(unwrapPaginator(medicineRes).items);
 
-      const apptArray = apptRes?.data?.data?.data || apptRes?.data?.data || [];
+      const apptArray = unwrapPaginator(apptRes).items;
       setRecentAppointments(Array.isArray(apptArray) ? apptArray : []);
-      const paymentArray = paymentRes?.data?.data?.data || paymentRes?.data?.data || [];
+      const paymentArray = canViewPayments ? unwrapPaginator(paymentRes).items : [];
       setPayments(Array.isArray(paymentArray) ? paymentArray : []);
       setRangeCache((prev) => ({
         ...prev,

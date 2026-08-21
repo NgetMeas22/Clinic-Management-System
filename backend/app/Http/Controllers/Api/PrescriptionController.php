@@ -29,12 +29,21 @@ class PrescriptionController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Prescription::with([
-                'patient',
-                'doctor.user',
-                'medicalRecord',
-                'items.medicine'
-            ]);
+            $perPage = min(max((int) $request->query('per_page', 10), 1), 200);
+
+            $query = Prescription::query()
+                ->select([
+                    'id', 'patient_id', 'doctor_id', 'medical_record_id',
+                    'prescription_date', 'notes', 'created_at',
+                ])
+                ->with([
+                    'patient:id,first_name,last_name,patient_code,gender,date_of_birth,phone,profile_picture',
+                    'doctor:id,user_id,specialization',
+                    'doctor.user:id,name,email,avatar',
+                    'medicalRecord:id,symptoms,diagnosis,treatment',
+                    'items:id,prescription_id,medicine_id,quantity,dosage,frequency,duration,instruction',
+                    'items.medicine:id,name,category,unit,price',
+                ]);
 
             if ($request->filled('patient_id')) {
                 $query->where('patient_id', $request->patient_id);
@@ -44,13 +53,29 @@ class PrescriptionController extends Controller
                 $query->where('doctor_id', $request->doctor_id);
             }
 
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas('patient', function ($p) use ($search) {
+                        $p->where('first_name', 'like', "%{$search}%")
+                            ->orWhere('last_name', 'like', "%{$search}%");
+                    })->orWhereHas('items.medicine', function ($m) use ($search) {
+                        $m->where('name', 'like', "%{$search}%");
+                    });
+
+                    if (is_numeric($search)) {
+                        $q->orWhere('id', (int) $search);
+                    }
+                });
+            }
+
             if ($this->isDoctor($request)) {
                 $doctorId = $this->doctorId($request);
 
                 if (!$doctorId) {
                     return response()->json([
                         'success' => true,
-                        'data' => Prescription::query()->where('id', 0)->paginate(10),
+                        'data' => Prescription::query()->where('id', 0)->paginate($perPage),
                     ], 200);
                 }
 
@@ -59,7 +84,7 @@ class PrescriptionController extends Controller
 
             $prescriptions = $query
                 ->latest()
-                ->paginate(10);
+                ->paginate($perPage);
 
             return response()->json([
                 'success' => true,

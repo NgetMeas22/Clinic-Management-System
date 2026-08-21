@@ -15,7 +15,11 @@ class UserController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = User::with('role');
+            $query = User::with('role:id,name,description')
+                ->select([
+                    'id', 'role_id', 'name', 'email', 'phone', 'avatar',
+                    'google_id', 'profile_picture', 'status', 'created_at',
+                ]);
 
             if ($request->filled('search')) {
                 $search = $request->search;
@@ -32,7 +36,9 @@ class UserController extends Controller
                 });
             }
 
-            $users = $query->latest()->paginate(10);
+            $perPage = min(max((int) $request->query('per_page', 10), 1), 200);
+
+            $users = $query->latest()->paginate($perPage);
 
             return response()->json([
                 'success' => true,

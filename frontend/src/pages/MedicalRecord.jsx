@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   AlertCircle,
   Eye,
@@ -29,6 +29,7 @@ import {
   TextInput,
 } from "../components/ui";
 import useUrlSearch from "../hooks/useUrlSearch";
+import unwrapPaginator from "../utils/paginate";
 
 const MedicalRecords = () => {
   const { user } = useAuth();
@@ -40,6 +41,7 @@ const MedicalRecords = () => {
   const [selectedDiagnosis, setSelectedDiagnosis] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
+  const [meta, setMeta] = useState({ currentPage: 1, lastPage: 1, total: 0, from: 0, to: 0 });
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -50,6 +52,7 @@ const MedicalRecords = () => {
   const [doctors, setDoctors] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loadingLookups, setLoadingLookups] = useState(false);
+  const [diagnosisOptions, setDiagnosisOptions] = useState([]);
 
   const canCreate = can(user, "medicalRecords", "create");
   const canUpdate = can(user, "medicalRecords", "update");
@@ -73,18 +76,23 @@ const MedicalRecords = () => {
     return fullName || "N/A";
   };
 
-  const fetchRecords = async () => {
+  const fetchRecords = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await medicalRecordService.getAll();
-      const data = response.data?.data?.data || response.data?.data || response.data || [];
-      setRecords(Array.isArray(data) ? data : []);
+      const params = { page: currentPage, per_page: itemsPerPage };
+      if (searchTerm) params.search = searchTerm;
+      if (selectedDiagnosis !== "All") params.diagnosis = selectedDiagnosis;
+
+      const response = await medicalRecordService.getAll(params);
+      const { items, meta } = unwrapPaginator(response);
+      setRecords(items);
+      setMeta(meta);
     } catch (error) {
       console.error("Failed to load medical records:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, searchTerm, selectedDiagnosis]);
 
   useEffect(() => {
     let isMounted = true;
@@ -92,16 +100,25 @@ const MedicalRecords = () => {
     const loadLookups = async () => {
       try {
         setLoadingLookups(true);
-        const [patientsRes, doctorsRes, appointmentsRes] = await Promise.all([
-          getPatients(),
-          getDoctors(),
-          getAppointments(),
+        const [patientsRes, doctorsRes, appointmentsRes, allRecordsRes] = await Promise.all([
+          getPatients({ per_page: 200 }),
+          getDoctors({ per_page: 200 }),
+          getAppointments({ per_page: 200 }),
+          medicalRecordService.getAll({ per_page: 200 }),
         ]);
-        const unwrap = (res) => res.data?.data?.data || res.data?.data || res.data || [];
         if (isMounted) {
-          setPatients(Array.isArray(unwrap(patientsRes)) ? unwrap(patientsRes) : []);
-          setDoctors(Array.isArray(unwrap(doctorsRes)) ? unwrap(doctorsRes) : []);
-          setAppointments(Array.isArray(unwrap(appointmentsRes)) ? unwrap(appointmentsRes) : []);
+          setPatients(unwrapPaginator(patientsRes).items);
+          setDoctors(unwrapPaginator(doctorsRes).items);
+          setAppointments(unwrapPaginator(appointmentsRes).items);
+          setDiagnosisOptions(
+            Array.from(
+              new Set(
+                unwrapPaginator(allRecordsRes)
+                  .items.map((r) => r.diagnosis)
+                  .filter(Boolean)
+              )
+            )
+          );
         }
       } catch (error) {
         console.error("Failed to load medical record options:", error);
@@ -112,55 +129,15 @@ const MedicalRecords = () => {
 
     loadLookups();
 
-    medicalRecordService
-      .getAll()
-      .then((response) => {
-        if (!isMounted) return;
-        const data = response.data?.data?.data || response.data?.data || response.data || [];
-        setRecords(Array.isArray(data) ? data : []);
-      })
-      .catch((error) => {
-        console.error("Failed to load medical records:", error);
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const filteredRecords = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    return records.filter((rec) => {
-      const patientName = getPatientName(rec.patient).toLowerCase();
-      const doctorName = (rec.doctor?.user?.name || rec.doctor?.name || "").toLowerCase();
-      const diagnosis = (rec.diagnosis || "").toLowerCase();
-
-      const matchesSearch =
-        !term ||
-        patientName.includes(term) ||
-        doctorName.includes(term) ||
-        diagnosis.includes(term);
-      const matchesDiagnosis =
-        selectedDiagnosis === "All" ||
-        (rec.diagnosis && rec.diagnosis.toLowerCase() === selectedDiagnosis.toLowerCase());
-
-      return matchesSearch && matchesDiagnosis;
-    });
-  }, [records, searchTerm, selectedDiagnosis]);
-
-  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage) || 1;
-  const paginatedRecords = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredRecords.slice(start, start + itemsPerPage);
-  }, [filteredRecords, currentPage]);
-
-  const uniqueDiagnoses = useMemo(() => {
-    const list = records.map((r) => r.diagnosis).filter(Boolean);
-    return ["All", ...Array.from(new Set(list))];
-  }, [records]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch sets loading state
+    fetchRecords();
+  }, [fetchRecords]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: reset pagination on new filters
@@ -273,7 +250,7 @@ const MedicalRecords = () => {
           onChange={(e) => setSelectedDiagnosis(e.target.value)}
           className="w-full md:w-56"
         >
-          {uniqueDiagnoses.map((diag) => (
+          {["All", ...diagnosisOptions].map((diag) => (
             <option key={diag} value={diag}>
               {diag === "All" ? "All Diagnoses" : diag}
             </option>
@@ -305,8 +282,8 @@ const MedicalRecords = () => {
                     ))}
                   </tr>
                 ))
-              ) : paginatedRecords.length > 0 ? (
-                paginatedRecords.map((record) => (
+              ) : records.length > 0 ? (
+                records.map((record) => (
                   <tr key={record.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-2.5">
@@ -389,14 +366,14 @@ const MedicalRecords = () => {
           </table>
         </div>
 
-        {!loading && filteredRecords.length > 0 && (
+        {!loading && records.length > 0 && (
           <Pagination
-            page={currentPage}
-            totalPages={totalPages}
+            page={meta.currentPage}
+            totalPages={meta.lastPage}
             onPageChange={setCurrentPage}
-            from={(currentPage - 1) * itemsPerPage + 1}
-            to={Math.min(currentPage * itemsPerPage, filteredRecords.length)}
-            total={filteredRecords.length}
+            from={meta.from}
+            to={meta.to}
+            total={meta.total}
             label="records"
           />
         )}
