@@ -4,6 +4,7 @@ import {
   Outlet,
   Route,
   Routes,
+  useLocation,
   useNavigate,
 } from "react-router-dom";
 
@@ -61,6 +62,7 @@ const APP_ROUTES = [
 function DashboardShell() {
   const { user, logout } = useAuth();
   const { localizedPath } = useLocale();
+  const location = useLocation();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -81,7 +83,9 @@ function DashboardShell() {
         <Navbar user={user} onLogout={handleLogout} />
 
         <main className="flex-1 bg-slate-50 px-4 py-4 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-          <Outlet />
+          <div key={location.pathname} className="page-enter">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

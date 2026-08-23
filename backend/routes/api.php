@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\MedicalRecordController;
 use App\Http\Controllers\Api\MedicineController;
 use App\Http\Controllers\Api\PatientController;
+use App\Http\Controllers\Api\OtpController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PrescriptionController;
 use App\Http\Controllers\Api\ReportController;
@@ -23,6 +24,10 @@ Route::post('/support/send', [SupportController::class, 'sendSupportMessage']);
 
 Route::get('/auth/google', [GoogleController::class, 'redirect']);
 Route::get('/auth/google/callback', [GoogleController::class, 'callback']);
+
+// Email OTP login (passwordless)
+Route::post('/auth/otp/request', [OtpController::class, 'requestCode'])->middleware('throttle:10,1');
+Route::post('/auth/otp/verify', [OtpController::class, 'verify'])->middleware('throttle:20,1');
 
 // Authenticated Routes
 Route::middleware('auth:sanctum')->group(function () {

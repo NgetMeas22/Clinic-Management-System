@@ -1,4 +1,5 @@
 import api from './api';
+import { cachedGet, invalidateCache } from '../api/cache';
 
 // Helper function to clean & normalize the payload into the exact field
 // names the backend validates (payment_date / payment_method / payment_status).
@@ -42,18 +43,12 @@ const formatPaymentPayload = (data) => {
 
 const paymentService = {
     getAll: async (params = {}) => {
-        const response = await api.get('/payments', {
-            params,
-        });
-
+        const response = await cachedGet('/payments', { params });
         return response.data;
     },
 
     getById: async (id) => {
-        const response = await api.get(
-            `/payments/${id}`
-        );
-
+        const response = await cachedGet(`/payments/${id}`);
         return response.data;
     },
 
@@ -61,11 +56,8 @@ const paymentService = {
         // បំប្លែង Data មុននឹង Send ទៅ Backend
         const payload = formatPaymentPayload(data);
 
-        const response = await api.post(
-            '/payments',
-            payload
-        );
-
+        const response = await api.post('/payments', payload);
+        invalidateCache(['/payments', '/dashboard']);
         return response.data;
     },
 
@@ -73,19 +65,14 @@ const paymentService = {
         // បំប្លែង Data មុននឹង Send ទៅ Backend
         const payload = formatPaymentPayload(data);
 
-        const response = await api.put(
-            `/payments/${id}`,
-            payload
-        );
-
+        const response = await api.put(`/payments/${id}`, payload);
+        invalidateCache(['/payments', '/dashboard']);
         return response.data;
     },
 
     delete: async (id) => {
-        const response = await api.delete(
-            `/payments/${id}`
-        );
-
+        const response = await api.delete(`/payments/${id}`);
+        invalidateCache(['/payments', '/dashboard']);
         return response.data;
     },
 };

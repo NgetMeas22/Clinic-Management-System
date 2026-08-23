@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Building2, Pencil, Plus, Trash2, Inbox } from "lucide-react";
 import api from "../services/api";
+import { cachedGet, invalidateCache } from "../api/cache";
 import { useAuth } from "../context/AuthContext";
 import { can } from "../utils/permissions";
 import {
@@ -47,7 +48,7 @@ export default function Departments() {
       if (searchQuery) params.search = searchQuery;
       if (statusFilter !== "all") params.status = statusFilter;
 
-      const response = await api.get("/departments", { params });
+      const response = await cachedGet("/departments", { params });
       const { items, meta } = unwrapPaginator(response);
       setDepartments(items);
       setMeta(meta);
@@ -113,6 +114,7 @@ export default function Departments() {
       } else {
         await api.post("/departments", form);
       }
+      invalidateCache(["/departments"]);
 
       closeModal();
       await loadDepartments();
@@ -143,6 +145,7 @@ export default function Departments() {
     setDeletingId(id);
     try {
       await api.delete(`/departments/${id}`);
+      invalidateCache(["/departments"]);
       if (editingId === id) closeModal();
       await loadDepartments();
     } catch (err) {

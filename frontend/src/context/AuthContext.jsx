@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import axios from 'axios';
+import { invalidateCache } from '../api/cache';
 
 const AuthContext = createContext();
 
@@ -20,6 +21,7 @@ export const AuthProvider = ({ children }) => {
       delete axios.defaults.headers.common['Authorization'];
       setToken('');
       setUser(null);
+      invalidateCache();
     }
   }, [token]);
 
@@ -54,18 +56,21 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const res = await axios.post('/login', { email, password });
     const { access_token, user } = res.data;
-    
+
     localStorage.setItem('token', access_token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-    
+    invalidateCache();
+
     setToken(access_token);
     setUser(user);
     return user;
   };
 
-  const loginWithToken = useCallback((newToken) => {
+  const loginWithToken = useCallback((newToken, nextUser) => {
     localStorage.setItem('token', newToken);
     axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+    invalidateCache();
+    if (nextUser) setUser(nextUser);
     setToken(newToken);
   }, []);
 

@@ -381,9 +381,9 @@ export default function Dashboard() {
         dashboardService.getMonthly(),
         dashboardService.getWeekly(),
         medicineService.getAll({ per_page: 200 }),
-        getAppointments({ per_page: 200 }),
+        getAppointments({ per_page: 50 }),
       ];
-      if (canViewPayments) requests.push(paymentService.getAll({ per_page: 200 }));
+      if (canViewPayments) requests.push(paymentService.getAll({ per_page: 50 }));
 
       const [dashboardRes, yearlyRes, weeklyRes, medicineRes, apptRes, paymentRes] =
         await Promise.all(requests);

@@ -273,7 +273,7 @@ export default function User() {
                             variant="ghost"
                             size="sm"
                             onClick={() => openEdit(item)}
-                            className="text-blue-600 hover:!bg-blue-50 dark:text-blue-400 dark:hover:!bg-blue-950/40"
+                            className="text-blue-600 hover:bg-blue-50! dark:text-blue-400 dark:hover:bg-blue-950/40!"
                           >
                             <Pencil size={14} />
                             Edit
@@ -284,7 +284,7 @@ export default function User() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setDeleteTarget(item)}
-                            className="text-red-600 hover:!bg-red-50 dark:text-red-400 dark:hover:!bg-red-950/30"
+                            className="text-red-600 hover:bg-red-50! dark:text-red-400 dark:hover:bg-red-950/30!"
                           >
                             <Trash2 size={14} />
                             Delete
