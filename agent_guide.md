@@ -74,7 +74,7 @@ clinic-management-system/
 │   ├── app/Models/          # User, Role, Department, Doctor, Patient, Appointment,
 │   │                        # MedicalRecord, Medicine (SoftDeletes), Prescription,
 │   │                        # PrescriptionItem, Payment
-│   ├── database/migrations/ # 11 domain tables + 5 alter migrations (see §5)
+│   ├── database/migrations/ # 11 domain tables + 6 alter migrations (see §5)
 │   ├── database/seeders/DatabaseSeeder.php   # roles + 3 users + doctor + 15 depts + 8 meds
 │   └── routes/api.php       # ALL API routes
 ├── frontend/           # React SPA
@@ -91,11 +91,10 @@ clinic-management-system/
 │       ├── context/                # AuthContext.jsx, ThemeContext.jsx, LocaleContext.jsx
 │       ├── hooks/useUrlSearch.js   # syncs a search term with the `?search=` URL param
 │       ├── i18n/translations.js    # km + en label strings (see §7)
-│       ├── layouts/                # AdminLayout/DoctorLayout/RoleRoute — DEAD CODE, no longer imported
+│       ├── layouts/                # AdminLayout/DoctorLayout/RoleRoute — EMPTY 0-byte stubs, dead code
 │       ├── pages/                  # one file per feature (see §7)
 │       ├── services/               # axios wrappers per resource
-│       └── utils/                  # permissions.js, localizedPath.js
-├── plan.txt             # original 10-day dev plan (historical; does not match final code exactly)
+│       └── utils/                  # permissions.js, localizedPath.js, paginate.js├── plan.txt             # original 10-day dev plan (historical; does not match final code exactly)
 ├── Structure.txt        # planned file tree (partially outdated)
 ├── Database.txt         # full SQL schema reference (does NOT include the new alter migrations)
 └── Architecture         # ASCII architecture + role permission overview
@@ -123,7 +122,8 @@ Role checking is **case-insensitive** (`RoleMiddleware` lowercases both sides).
 | users | Admin | Admin | Admin |
 | reports | — | — | Admin only |
 
-Dashboard + `/me`, `/profile`, `/password`, `/logout` are available to all three roles.
+Dashboard + `/me`, `/profile`, `/password`, `/logout` have **no role middleware** — any
+authenticated Sanctum user can call them.
 
 Doctor-specific scoping: in `AppointmentController`, `MedicalRecordController`, and
 `PrescriptionController`, a Doctor user only sees rows where `doctor_id` = their linked Doctor
@@ -165,8 +165,8 @@ Tables (11 domain tables):
    emergency_phone, status
 6. **appointments** — patient_id, doctor_id, appointment_date, appointment_time, reason,
    status (pending/confirmed/completed/cancelled), notes
-7. **medical_records** — patient_id, doctor_id, appointment_id (unique), symptoms, diagnosis,
-   treatment, notes
+7. **medical_records** — patient_id, doctor_id, appointment_id (nullable, SET NULL on delete —
+   **no unique constraint**), symptoms, diagnosis, treatment, notes
 8. **medicines** — name, category, description, quantity (unsigned), unit, price
    (DECIMAL 10,2), expiry_date, status, **deleted_at (soft deletes)**
 9. **prescriptions** — patient_id, doctor_id, medical_record_id, prescription_date, notes
@@ -191,9 +191,11 @@ Key relationships (Eloquent):
 - Patient 1—N Appointment / MedicalRecord / Prescription / Payment
 - Appointment 1—1 MedicalRecord; 1—N Payment
 - MedicalRecord 1—N Prescription; Prescription 1—N PrescriptionItem N—1 Medicine
-- `User` model has an `avatar_url` accessor: prefers the Google `avatar` URL when present,
-  otherwise falls back to `asset('storage/'.$profile_picture)`.
-- `Medicine` uses the `SoftDeletes` trait.
+- `User` model has an `avatar_url` accessor (appended to JSON): prefers the Google `avatar`
+  URL when present, otherwise falls back to `asset('storage/'.$profile_picture)`. `Doctor`
+  and `Patient` models expose the same `avatar_url` accessor pattern.
+- `Medicine` uses the `SoftDeletes` trait; `Payment` casts `amount` decimal:2 and
+  `payment_date` date.
 
 ### Seeded data (`DatabaseSeeder`)
 
@@ -221,11 +223,12 @@ All under `/api` prefix. Public: `POST /api/login`, `POST /api/support/send`,
 
 - `GET /api/auth/google` redirects to Google; `GET /api/auth/google/callback` exchanges the
   code, then finds the user by `google_id` **or email** (linking an existing account) or
-  creates one with `role_id = 3` (**Receptionist**, hardcoded), a random 16-char password,
-  and the Google avatar.
+  creates one with a random 16-char password and the Google avatar; new users get the
+  **Receptionist** role (looked up from `roles`, falls back to id 3).
 - The callback ends with a redirect to `{FRONTEND_URL}/auth/callback?token=<sanctum token>`
-  (`FRONTEND_URL` env, default `http://localhost:5173`). See §10 for the missing frontend
-  handler for this URL.
+  (`FRONTEND_URL` env, default `http://localhost:5173`). Failure paths redirect to
+  `{FRONTEND_URL}/login?error=google` or `?error=inactive`. The frontend handler is
+  `src/pages/Auth/GoogleCallback.jsx` (see §7).
 
 ### Support → Telegram
 
@@ -277,9 +280,13 @@ Notes / gotchas:
 - `src/App.jsx` is a thin wrapper around `src/routes/AppRoutes.jsx`.
 - `AppRoutes.jsx` defines the `APP_ROUTES` array (path → component → allowed roles), groups
   them by role set, and renders each group under `ProtectedRoute` + a shared `DashboardShell`
-  (collapsible `Sidebar` + `Navbar` + `<Outlet />`).
-- `src/layouts/` (`AdminLayout`, `DoctorLayout`, `RoleRoute`) is **dead code** — nothing imports
-  it. Don't resurrect it; use the `AppRoutes.jsx` pattern.
+  (collapsible `Sidebar` + `Navbar` + `<Outlet />`). The full route table is duplicated under
+  an `/en` subtree (locale-prefixed twins of every route).
+- Top-level routes: `/`→redirect `/dashboard`, `/login`, `/register`, `/auth/callback`
+  (Google OAuth), `/403`; unknown paths redirect to `/dashboard`. `ProtectedRoute` renders
+  the `Unauthorized` page **inline** for role mismatches (it does not redirect to `/403`).
+- `src/layouts/` (`AdminLayout`, `DoctorLayout`, `RoleRoute`) contains **empty 0-byte stub
+  files** — nothing imports them. Don't resurrect it; use the `AppRoutes.jsx` pattern.
 
 ### Shared UI kit (`src/components/ui/`)
 
@@ -300,15 +307,17 @@ Notes / gotchas:
 
 `Dashboard`, `Appointments`, `Doctor`, `Patients`, `MedicalRecord`, `Prescription`,
 `Department`, `Medicine`, `Payment`, **`Inventory`**, **`Billing`**, `Reports`, `User`,
-`Profile`, `Settings`, `Support`, `Unauthorized`, plus `Auth/Login`, `Auth/Register`, and
-`Auth/Doctor.jsx` (a stray re-export of the `Doctor` page — leave alone unless asked).
+`Profile`, `Settings`, `Support`, `Unauthorized`, plus `Auth/Login`, `Auth/Register`,
+**`Auth/GoogleCallback`** (persists the OAuth token via `loginWithToken`, then redirects),
+and `Auth/Doctor.jsx` (a stray re-export of the `Doctor` page — leave alone unless asked).
 
 Note: `/inventory` and `/billing` are now **full standalone pages** (`Inventory.jsx`,
 `Billing.jsx`) — they no longer simply re-render `Medicine`/`Payment`.
 
 - **Login** also offers "Sign in with Google", which hard-navigates to
-  `http://localhost:8000/api/auth/google` (hardcoded in `Login.jsx` — update it there if the
-  backend host changes).
+  `` `${api.defaults.baseURL}/auth/google` `` (i.e. `http://127.0.0.1:8000/api/auth/google`)
+  from `Login.jsx`. The backend redirects back to `/auth/callback?token=...`, handled by
+  `GoogleCallback.jsx`; errors land on `/login?error=google|inactive`.
 - **Support** posts to `/api/support/send`; the backend relays the message to Telegram
   (previously it opened a `mailto:` link — that path is gone).
 
@@ -331,11 +340,15 @@ headers/401/403 handling apply.
 
 ### State
 
-- `AuthContext` provides `{ user, token, login, logout, loading, updateProfile,
-  changePassword }`. `updateProfile` supports both plain JSON and `FormData` (for
-  `profile_picture` uploads, sent as a `POST` with `_method: PUT`).
+- `AuthContext` provides `{ user, token, login, loginWithToken, logout, loading,
+  updateProfile, changePassword }`. `loginWithToken` stores a raw Sanctum token (used by
+  `GoogleCallback`). `updateProfile` supports both plain JSON and `FormData` (for
+  `profile_picture` uploads, sent as a `POST` with `_method: PUT`). Note: it uses the
+  **global** `axios` import and sets `axios.defaults.baseURL` itself — not the shared instance.
 - `ThemeContext` handles dark/light mode (Tailwind `dark:` classes).
 - `LocaleContext` handles language. No Redux / react-query — keep using context + local state.
+- Provider order in `main.jsx`: `BrowserRouter > ThemeProvider > LocaleProvider > AuthProvider`;
+  `main.jsx` also imports `./api/axios` for its side-effect (interceptor registration).
 
 ### Styling
 
@@ -405,17 +418,22 @@ npm run lint                    # ESLint
 
 - **Register page exists but no backend register endpoint** — `Register.jsx` has no working
   API to call.
-- **Google OAuth callback has no frontend handler yet.** The backend redirects to
-  `{FRONTEND_URL}/auth/callback?token=...`, but `AppRoutes.jsx` defines no `/auth/callback`
-  route, so the wildcard rule just bounces to `/dashboard` **without storing the token** —
-  Google sign-in currently does not complete a login. A handler page that persists the token
-  (same `localStorage` key `token`) and redirects is still to be built.
+- **Google OAuth is wired end-to-end now.** Backend redirects to
+  `{FRONTEND_URL}/auth/callback?token=...`; the `/auth/callback` (and `/en/auth/callback`)
+  routes render `src/pages/Auth/GoogleCallback.jsx`, which persists the token via
+  `AuthContext.loginWithToken` and navigates to the dashboard. Failure modes redirect to the
+  login page with `?error=google|inactive`. Google-created users are **Receptionist**.
 - **Support page depends on Telegram env vars.** If `TELEGRAM_BOT_TOKEN` /
   `TELEGRAM_CHAT_ID` are missing, `/api/support/send` returns 500.
-- The Login page's Google button hardcodes `http://localhost:8000` (not `127.0.0.1`) and
-  ignores the axios baseURL / locale prefix.
-- **`src/layouts/` is dead code** (`AdminLayout`, `DoctorLayout`, `RoleRoute` are unimported).
-  Routing/layout now lives entirely in `src/routes/AppRoutes.jsx`.
+- **`src/layouts/` files are empty 0-byte stubs** (`AdminLayout`, `DoctorLayout`, `RoleRoute`
+  — unimported). Routing/layout lives entirely in `src/routes/AppRoutes.jsx`.
+- `CheckRole.php` middleware exists but is dead code — its `role` alias in `Http/Kernel.php`
+  is commented out; `RoleMiddleware` (case-insensitive) is the active one. Don't confuse them.
+- Migration `2026_08_21_030410` uses `->nullable()->change()` on `users.password`, which on
+  Laravel 10/MySQL normally requires `doctrine/dbal` — it is not in `composer.json`. If a
+  fresh install fails on that migration, install it or rewrite the migration with raw SQL.
+- The Login page's Google button builds its URL from `api.defaults.baseURL`
+  (`http://127.0.0.1:8000/api`) but ignores the locale prefix.
 - `AuthContext.jsx` sets `axios.defaults.baseURL` while `services/api.js` uses its own instance
   (`src/api/axios.js`) with the same base URL — keep both pointing at `http://127.0.0.1:8000/api`.
 - Seeded login passwords are `admin12345` / `doctor12345` / `receptionist12345` — **not** `password`.

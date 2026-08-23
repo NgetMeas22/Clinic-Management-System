@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Department;
+// use App\Models\Department;
 use App\Models\Doctor;
 use App\Models\Role;
 use App\Models\User;
