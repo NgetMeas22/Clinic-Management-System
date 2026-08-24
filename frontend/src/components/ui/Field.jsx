@@ -1,5 +1,5 @@
 const BASE_FIELD =
-  "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500";
+  "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition-all duration-150 placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-blue-500 dark:disabled:bg-slate-800/50";
 
 const SELECT_FIELD =
   "appearance-none pr-9 cursor-pointer";
@@ -26,7 +26,9 @@ export default function Field({
       )}
       {children}
       {hint && !error && <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{hint}</p>}
-      {error && <p className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">{error}</p>}
+      {error && (
+        <p className="field-error mt-1 text-xs font-medium text-red-600 dark:text-red-400">{error}</p>
+      )}
     </div>
   );
 }

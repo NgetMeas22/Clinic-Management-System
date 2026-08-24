@@ -34,9 +34,9 @@ const AppointmentModal = ({
           <Button
             type="submit"
             form={FORM_ID}
-            disabled={loading}
+            loading={loading}
           >
-            {loading ? "Saving…" : isEditing ? "Update Appointment" : "Create Appointment"}
+            {isEditing ? "Update Appointment" : "Create Appointment"}
           </Button>
         </>
       }

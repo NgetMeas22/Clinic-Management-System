@@ -89,7 +89,7 @@ const Prescriptions = () => {
       />
 
       {toast && (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+        <div className="empty-state flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
           <CheckCircle2 size={16} className="shrink-0" />
           {toast}
         </div>

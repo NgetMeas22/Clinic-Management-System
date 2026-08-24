@@ -1,12 +1,14 @@
+import { Loader2 } from "lucide-react";
+
 const VARIANTS = {
   primary:
-    "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-sm shadow-blue-600/20 focus-visible:ring-blue-500/30",
+    "bg-blue-600 text-white shadow-sm shadow-blue-600/20 hover:-translate-y-px hover:bg-blue-700 hover:shadow-md hover:shadow-blue-600/25 active:translate-y-0 active:scale-[0.98] focus-visible:ring-blue-500/30",
   secondary:
-    "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700",
+    "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-700",
   danger:
-    "bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-sm focus-visible:ring-red-500/30",
+    "bg-red-600 text-white shadow-sm shadow-red-600/20 hover:-translate-y-px hover:bg-red-700 hover:shadow-md hover:shadow-red-600/25 active:translate-y-0 active:scale-[0.98] focus-visible:ring-red-500/30",
   ghost:
-    "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
+    "text-slate-600 hover:bg-slate-100 hover:text-slate-900 active:scale-[0.98] dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
 };
 
 const SIZES = {
@@ -20,13 +22,22 @@ export default function Button({
   size = "md",
   className = "",
   type = "button",
+  loading = false,
+  disabled,
+  children,
   ...props
 }) {
+  const isDisabled = disabled || loading;
+
   return (
     <button
       type={type}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors focus:outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-60 ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      disabled={isDisabled}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...props}
-    />
+    >
+      {loading && <Loader2 size={16} className="animate-spin" />}
+      {children}
+    </button>
   );
 }

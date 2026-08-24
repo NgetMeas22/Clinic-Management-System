@@ -210,8 +210,8 @@ const PrescriptionFormModal = ({ open, onClose, onCreated }) => {
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting || loadingLookups} type="submit" form="prescription-form">
-            {submitting ? 'Saving…' : 'Save Prescription'}
+          <Button onClick={handleSubmit} loading={submitting || loadingLookups} type="submit" form="prescription-form">
+            Save Prescription
           </Button>
         </>
       }

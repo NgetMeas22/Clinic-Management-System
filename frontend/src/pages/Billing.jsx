@@ -90,6 +90,7 @@ const Billing = () => {
   const [loadingLookups, setLoadingLookups] = useState(false);
 
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const canCreate = can(user, "payments", "create");
@@ -141,14 +142,17 @@ const Billing = () => {
     };
   }, [payments]);
 
-  const confirmDelete = (payment) => setPendingDelete(payment);
+  const confirmDelete = (payment) => {
+    setPendingDelete(payment);
+    setShowDelete(true);
+  };
 
   const handleDelete = async () => {
     if (!pendingDelete) return;
     try {
       setDeleting(true);
       await paymentService.delete(pendingDelete.id);
-      setPendingDelete(null);
+      setShowDelete(false);
       await loadPayments();
     } catch (err) {
       console.error("Failed to delete payment:", err);
@@ -399,15 +403,15 @@ const Billing = () => {
             <Button variant="secondary" onClick={() => setShowAddModal(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={saving || loadingLookups} type="submit" form="payment-form">
-              {saving ? "Saving…" : "Save Payment"}
+            <Button onClick={handleCreate} loading={saving || loadingLookups} type="submit" form="payment-form">
+              Save Payment
             </Button>
           </>
         }
       >
         <form id="payment-form" onSubmit={handleCreate} className="space-y-4">
           {formError && (
-            <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+            <div className="field-error rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
               {formError}
             </div>
           )}
@@ -497,8 +501,8 @@ const Billing = () => {
       </Modal>
 
       <Modal
-        open={Boolean(pendingDelete)}
-        onClose={() => !deleting && setPendingDelete(null)}
+        open={showDelete}
+        onClose={() => !deleting && setShowDelete(false)}
         size="sm"
         title="Delete this payment?"
         subtitle={
@@ -510,11 +514,11 @@ const Billing = () => {
         }
         footer={
           <>
-            <Button variant="secondary" onClick={() => setPendingDelete(null)} disabled={deleting}>
+            <Button variant="secondary" onClick={() => setShowDelete(false)} disabled={deleting}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={handleDelete} disabled={deleting}>
-              {deleting ? "Deleting…" : "Delete Payment"}
+            <Button variant="danger" onClick={handleDelete} loading={deleting}>
+              Delete Payment
             </Button>
           </>
         }

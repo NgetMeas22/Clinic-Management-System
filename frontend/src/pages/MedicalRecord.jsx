@@ -45,6 +45,7 @@ const MedicalRecords = () => {
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [showRecord, setShowRecord] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -320,7 +321,10 @@ const MedicalRecords = () => {
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => setSelectedRecord(record)}
+                          onClick={() => {
+                            setSelectedRecord(record);
+                            setShowRecord(true);
+                          }}
                           className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800"
                           title="View Details"
                         >
@@ -380,8 +384,8 @@ const MedicalRecords = () => {
       </Card>
 
       <Modal
-        open={Boolean(selectedRecord)}
-        onClose={() => setSelectedRecord(null)}
+        open={showRecord}
+        onClose={() => setShowRecord(false)}
         icon={FileText}
         title="Medical Record Details"
         subtitle={
@@ -390,7 +394,7 @@ const MedicalRecords = () => {
             : ""
         }
         footer={
-          <Button variant="secondary" onClick={() => setSelectedRecord(null)}>
+          <Button variant="secondary" onClick={() => setShowRecord(false)}>
             Close
           </Button>
         }
@@ -453,17 +457,17 @@ const MedicalRecords = () => {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || loadingLookups}
+              loading={submitting || loadingLookups}
               type="submit"
               form="medical-record-form"
             >
-              {submitting ? "Saving…" : editingId ? "Update Record" : "Save Record"}
+              {editingId ? "Update Record" : "Save Record"}
             </Button>
           </>
         }
       >
         {errorMsg && (
-          <div className="flex items-start gap-3 rounded-xl border border-red-200/60 bg-red-50/80 p-3.5 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+          <div className="field-error flex items-start gap-3 rounded-xl border border-red-200/60 bg-red-50/80 p-3.5 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
             <AlertCircle size={16} className="mt-0.5 shrink-0 text-red-600" />
             <span className="font-medium leading-relaxed">{errorMsg}</span>
           </div>

@@ -92,9 +92,6 @@ export default function Departments() {
   };
 
   const closeModal = () => {
-    setForm(emptyForm);
-    setEditingId(null);
-    setError("");
     setIsModalOpen(false);
   };
 
@@ -314,8 +311,8 @@ export default function Departments() {
             <Button variant="secondary" onClick={closeModal}>
               Cancel
             </Button>
-            <Button onClick={save} disabled={saving} type="submit" form="department-form">
-              {saving ? "Saving…" : editingId ? "Update Department" : "Save Department"}
+            <Button onClick={save} loading={saving} type="submit" form="department-form">
+              {editingId ? "Update Department" : "Save Department"}
             </Button>
           </>
         }

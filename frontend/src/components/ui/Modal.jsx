@@ -1,6 +1,8 @@
 import { X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useId, useState } from "react";
 import { useLocale } from "../../context/LocaleContext";
+
+const EXIT_MS = 160;
 
 export default function Modal({
   open,
@@ -13,9 +15,32 @@ export default function Modal({
   size = "md",
 }) {
   const { t } = useLocale();
+  const titleId = useId();
+  const [shown, setShown] = useState(open);
+  const [closing, setClosing] = useState(false);
+  const [prevOpen, setPrevOpen] = useState(open);
+
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (open) {
+      setShown(true);
+      setClosing(false);
+    } else {
+      setClosing(true);
+    }
+  }
 
   useEffect(() => {
-    if (!open) return;
+    if (!closing) return undefined;
+    const timer = setTimeout(() => {
+      setShown(false);
+      setClosing(false);
+    }, EXIT_MS);
+    return () => clearTimeout(timer);
+  }, [closing]);
+
+  useEffect(() => {
+    if (!shown) return undefined;
     const handleKey = (e) => e.key === "Escape" && onClose?.();
     document.addEventListener("keydown", handleKey);
     document.body.style.overflow = "hidden";
@@ -23,9 +48,9 @@ export default function Modal({
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [shown, onClose]);
 
-  if (!open) return null;
+  if (!shown) return null;
 
   const sizes = {
     sm: "max-w-sm",
@@ -36,23 +61,28 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm ${
+        closing ? "modal-backdrop-out" : "modal-backdrop"
+      }`}
       onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
     >
       <div
-        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 ${sizes[size]}`}
+        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl will-change-transform dark:border-slate-800 dark:bg-slate-900 ${
+          closing ? "modal-panel-out" : "modal-panel"
+        } ${sizes[size]}`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5 dark:border-slate-800">
           <div className="flex items-center gap-3">
             {Icon && (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+              <div className="modal-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 ring-1 ring-inset ring-blue-600/10 dark:bg-blue-500/10 dark:text-blue-400">
                 <Icon size={20} />
               </div>
             )}
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h3>
+              <h3 id={titleId} className="text-lg font-bold text-slate-900 dark:text-white">{title}</h3>
               {subtitle && (
                 <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
               )}
@@ -61,7 +91,7 @@ export default function Modal({
           <button
             onClick={onClose}
             aria-label={t("common.close")}
-            className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            className="rounded-lg p-2 text-slate-400 transition-all duration-150 hover:rotate-90 hover:bg-slate-100 hover:text-slate-600 active:scale-90 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
             <X size={18} />
           </button>

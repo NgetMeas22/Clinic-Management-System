@@ -595,8 +595,8 @@ export default function Doctors() {
             <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button disabled={submitting} type="submit" form="doctor-form">
-              {submitting ? "Saving…" : editingDoctorId ? "Update Doctor Record" : "Save Doctor Record"}
+            <Button loading={submitting} type="submit" form="doctor-form">
+              {editingDoctorId ? "Update Doctor Record" : "Save Doctor Record"}
             </Button>
           </>
         }

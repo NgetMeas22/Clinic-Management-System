@@ -51,6 +51,7 @@ export default function User() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
@@ -116,8 +117,6 @@ export default function User() {
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setEditingId(null);
-    setForm(emptyForm);
   };
 
   const handleSubmit = async (e) => {
@@ -160,7 +159,7 @@ export default function User() {
     try {
       setDeleting(true);
       await userService.delete(deleteTarget.id);
-      setDeleteTarget(null);
+      setShowDelete(false);
       await loadUsers(page);
     } catch (err) {
       console.error("Failed to delete user:", err);
@@ -283,7 +282,10 @@ export default function User() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setDeleteTarget(item)}
+                            onClick={() => {
+                              setDeleteTarget(item);
+                              setShowDelete(true);
+                            }}
                             className="text-red-600 hover:bg-red-50! dark:text-red-400 dark:hover:bg-red-950/30!"
                           >
                             <Trash2 size={14} />
@@ -339,8 +341,8 @@ export default function User() {
             <Button variant="secondary" onClick={closeModal}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={submitting} type="submit" form="user-form">
-              {submitting ? "Saving…" : editingId ? "Update User" : "Save User"}
+            <Button onClick={handleSubmit} loading={submitting} type="submit" form="user-form">
+              {editingId ? "Update User" : "Save User"}
             </Button>
           </>
         }
@@ -388,18 +390,18 @@ export default function User() {
       </Modal>
 
       <Modal
-        open={Boolean(deleteTarget)}
-        onClose={() => !deleting && setDeleteTarget(null)}
+        open={showDelete}
+        onClose={() => !deleting && setShowDelete(false)}
         size="sm"
         title="Delete this user?"
         subtitle={deleteTarget ? `${deleteTarget.name} will be removed from the system.` : ""}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+            <Button variant="secondary" onClick={() => setShowDelete(false)} disabled={deleting}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={handleDelete} disabled={deleting}>
-              {deleting ? "Deleting…" : "Delete"}
+            <Button variant="danger" onClick={handleDelete} loading={deleting}>
+              Delete
             </Button>
           </>
         }

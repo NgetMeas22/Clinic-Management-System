@@ -80,6 +80,7 @@ const Inventory = () => {
   const [formError, setFormError] = useState("");
 
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const canCreate = can(user, "medicines", "create");
@@ -193,14 +194,17 @@ const Inventory = () => {
     }
   };
 
-  const confirmDelete = (medicine) => setPendingDelete(medicine);
+  const confirmDelete = (medicine) => {
+    setPendingDelete(medicine);
+    setShowDelete(true);
+  };
 
   const handleDelete = async () => {
     if (!pendingDelete) return;
     try {
       setDeleting(true);
       await medicineService.delete(pendingDelete.id);
-      setPendingDelete(null);
+      setShowDelete(false);
       await loadMedicines();
     } catch (err) {
       console.error("Failed to delete medicine:", err);
@@ -379,15 +383,15 @@ const Inventory = () => {
             <Button variant="secondary" onClick={() => setShowModal(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={saving} type="submit" form="medicine-form">
-              {saving ? "Saving…" : editing ? "Update Medicine" : "Save Medicine"}
+            <Button onClick={handleSubmit} loading={saving} type="submit" form="medicine-form">
+              {editing ? "Update Medicine" : "Save Medicine"}
             </Button>
           </>
         }
       >
         <form id="medicine-form" onSubmit={handleSubmit} className="space-y-4">
           {formError && (
-            <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+            <div className="field-error rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
               {formError}
             </div>
           )}
@@ -424,8 +428,8 @@ const Inventory = () => {
       </Modal>
 
       <Modal
-        open={Boolean(pendingDelete)}
-        onClose={() => !deleting && setPendingDelete(null)}
+        open={showDelete}
+        onClose={() => !deleting && setShowDelete(false)}
         size="sm"
         title="Delete this medicine?"
         subtitle={
@@ -435,11 +439,11 @@ const Inventory = () => {
         }
         footer={
           <>
-            <Button variant="secondary" onClick={() => setPendingDelete(null)} disabled={deleting}>
+            <Button variant="secondary" onClick={() => setShowDelete(false)} disabled={deleting}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={handleDelete} disabled={deleting}>
-              {deleting ? "Deleting…" : "Delete"}
+            <Button variant="danger" onClick={handleDelete} loading={deleting}>
+              Delete
             </Button>
           </>
         }

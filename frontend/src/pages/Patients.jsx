@@ -571,16 +571,15 @@ export default function Patients() {
             <Button variant="secondary" onClick={handleCloseModal}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={submitting}>
-              {submitting && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
-              {submitting ? "Saving…" : editingPatientId ? "Update Patient" : "Save Patient"}
+            <Button onClick={handleSubmit} loading={submitting}>
+              {editingPatientId ? "Update Patient" : "Save Patient"}
             </Button>
           </>
         }
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           {formErrors && (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-semibold whitespace-pre-line text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-300">
+            <div className="field-error rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-semibold whitespace-pre-line text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-300">
               {formErrors}
             </div>
           )}

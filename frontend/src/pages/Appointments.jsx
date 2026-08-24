@@ -99,7 +99,6 @@ const Appointments = () => {
 
     const handleCloseModal = () => {
         setIsModalOpen(false);
-        setSelectedAppointment(null);
     };
 
     const handleSubmit = async (data) => {
