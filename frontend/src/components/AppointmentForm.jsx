@@ -117,7 +117,7 @@ const AppointmentForm = ({
       </Field>
 
       <div>
-        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Status
         </label>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

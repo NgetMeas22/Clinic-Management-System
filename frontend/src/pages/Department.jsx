@@ -319,36 +319,38 @@ export default function Departments() {
       >
         <form id="department-form" onSubmit={save} className="space-y-4">
           {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-400">
+            <div className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400">
               {error}
             </div>
           )}
 
-          <Field label="Department Name" required>
-            <TextInput
-              placeholder="e.g., Cardiology"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Department Name" required>
+              <TextInput
+                placeholder="e.g., Cardiology"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </Field>
 
-          <Field label="Description">
+            <Field label="Status" required>
+              <SelectInput
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </SelectInput>
+            </Field>
+          </div>
+
+          <Field label="Description" hint="Briefly describe this department's role in the clinic.">
             <TextArea
               rows={3}
               placeholder="Brief description of responsibilities..."
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
-          </Field>
-
-          <Field label="Status">
-            <SelectInput
-              value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value })}
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </SelectInput>
           </Field>
         </form>
       </Modal>

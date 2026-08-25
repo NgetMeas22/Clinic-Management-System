@@ -92,8 +92,18 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
+  const deleteAccount = async (data) => {
+    const res = await axios.delete('/account', { data });
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+    setToken('');
+    setUser(null);
+    invalidateCache();
+    return res.data;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, loginWithToken, logout, loading, updateProfile, changePassword }}>
+    <AuthContext.Provider value={{ user, token, login, loginWithToken, logout, loading, updateProfile, changePassword, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

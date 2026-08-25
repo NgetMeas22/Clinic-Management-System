@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -140,6 +141,72 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Password changed successfully.',
+        ], 200);
+    }
+
+    public function deleteAccount(Request $request)
+    {
+        $user = $request->user()->load('doctor');
+
+        $rules = [
+            'confirmation_email' => 'required|email',
+        ];
+
+        if ($user->password) {
+            $rules['password'] = 'required|string';
+        }
+
+        $validated = $request->validate($rules);
+
+        if (strtolower($validated['confirmation_email']) !== strtolower($user->email)) {
+            return response()->json([
+                'message' => 'Type your account email to confirm this action.',
+                'errors' => [
+                    'confirmation_email' => ['Type your account email to confirm this action.'],
+                ],
+            ], 422);
+        }
+
+        if ($user->password && !Hash::check($validated['password'], $user->password)) {
+            return response()->json([
+                'message' => 'Current password is incorrect.',
+                'errors' => [
+                    'password' => ['Current password is incorrect.'],
+                ],
+            ], 422);
+        }
+
+        $wasDeactivated = false;
+
+        DB::transaction(function () use ($user, &$wasDeactivated) {
+            $doctor = $user->doctor;
+            $hasClinicalHistory = $doctor && (
+                $doctor->appointments()->exists()
+                || $doctor->medicalRecords()->exists()
+                || $doctor->prescriptions()->exists()
+            );
+
+            $user->tokens()->delete();
+
+            if ($hasClinicalHistory) {
+                $user->update(['status' => 'inactive']);
+                $doctor->update(['status' => 'inactive']);
+                $wasDeactivated = true;
+                return;
+            }
+
+            if ($user->profile_picture) {
+                Storage::disk('public')->delete($user->profile_picture);
+            }
+
+            $user->delete();
+        });
+
+        return response()->json([
+            'message' => $wasDeactivated
+                ? 'Your account has clinical history, so it was deactivated instead of deleted.'
+                : 'Your account has been deleted.',
+            'deactivated' => $wasDeactivated,
         ], 200);
     }
 

@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
@@ -23,6 +24,20 @@ class OtpController extends Controller
         ]);
 
         $email = strtolower(trim($request->input('email')));
+
+        $mailUsername = (string) config('mail.mailers.smtp.username');
+        $mailPassword = (string) config('mail.mailers.smtp.password');
+
+        if (
+            $mailUsername === '' || $mailPassword === ''
+            || str_contains($mailUsername, 'YOUR_GMAIL')
+            || str_contains($mailPassword, 'YOUR_16_CHAR')
+            || strtolower($mailUsername) === 'null'
+        ) {
+            return response()->json([
+                'message' => 'Email is not configured yet. Add a real Gmail address and app password in backend/.env.',
+            ], 503);
+        }
 
         if (!Cache::add("otp-resend:{$email}", true, (int) config('otp.resend_after_seconds'))) {
             return response()->json([
@@ -55,6 +70,18 @@ class OtpController extends Controller
         ]);
 
         try {
+            $mailUsername = (string) config('mail.mailers.smtp.username');
+            $mailPassword = (string) config('mail.mailers.smtp.password');
+
+            if (
+                Config::get('mail.default') === 'smtp' &&
+                (str_contains($mailUsername, 'YOUR_GMAIL') || str_contains($mailPassword, 'YOUR_16_CHAR_APP_PASSWORD'))
+            ) {
+                return response()->json([
+                    'message' => 'Email is not configured yet. Add a real Gmail address and app password in backend/.env.',
+                ], 500);
+            }
+
             Mail::to($user->email)->send(new OtpMail(
                 $user->name,
                 $code,

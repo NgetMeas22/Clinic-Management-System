@@ -6,7 +6,7 @@ import api from "../../api/axios";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function Login() {
-  const [mode, setMode] = useState("password");
+  const [mode, setMode] = useState("otp");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -55,10 +55,10 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const res = await api.post("/auth/otp/request", { email });
+      await api.post("/auth/otp/request", { email });
       setOtpStage("code");
       setResendIn(60);
-      if (res.data?.debug_code) setOtpCode(res.data.debug_code);
+      setOtpCode("");
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -88,7 +88,7 @@ export default function Login() {
     }
   };
 
-  // Function សម្រាប់ Redirect ទៅ Google OAuth2 Backend Endpoint
+  // Redirect ទៅ Google OAuth2 Backend Endpoint
   const handleGoogleLogin = () => {
     window.location.href = `${api.defaults.baseURL}/auth/google`;
   };
@@ -108,7 +108,6 @@ export default function Login() {
         <LanguageSwitcher compact />
       </div>
 
-      {/* Container resized to max-w-lg matching Register */}
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
 
         {/* Compact Header */}
@@ -126,7 +125,7 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Compact Body */}
+        {/* Body */}
         <div className="p-6">
           <div className="mb-4">
             <h2 className="text-base font-bold text-slate-800">
@@ -139,7 +138,7 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Compact Error Alert */}
+          {/* Error Alert */}
           {error && (
             <div className="mb-3 bg-red-50 border-l-4 border-red-500 p-2.5 rounded-r-md flex items-center gap-2">
               <svg
@@ -183,13 +182,13 @@ export default function Login() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            Sign in with Google
+            {t("login.signInWithGoogle")}
           </button>
 
           {/* Divider */}
           <div className="relative flex py-2 items-center">
             <div className="grow border-t border-slate-200"></div>
-            <span className="shrink mx-3 text-xs text-slate-400">or</span>
+            <span className="shrink mx-3 text-xs text-slate-400">{t("login.or")}</span>
             <div className="grow border-t border-slate-200"></div>
           </div>
 
@@ -246,6 +245,7 @@ export default function Login() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="doctor@ngmclinic.com"
+                    disabled={otpStage === "code"}
                     className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all disabled:bg-slate-50 disabled:text-slate-400"
                     required
                   />
@@ -276,7 +276,7 @@ export default function Login() {
                     onChange={(e) =>
                       setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))
                     }
-                    placeholder="123456"
+                    placeholder="••••••••"
                     className="w-full py-2 px-3 text-base text-center tracking-[0.5em] rounded-lg border border-slate-200 text-slate-800 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
                     required
                   />

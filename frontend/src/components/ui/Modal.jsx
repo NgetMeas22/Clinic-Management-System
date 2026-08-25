@@ -54,14 +54,14 @@ export default function Modal({
 
   const sizes = {
     sm: "max-w-sm",
-    md: "max-w-lg",
+    md: "max-w-xl",
     lg: "max-w-2xl",
     xl: "max-w-4xl",
   };
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm ${
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm transition-all ${
         closing ? "modal-backdrop-out" : "modal-backdrop"
       }`}
       onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}
@@ -70,21 +70,25 @@ export default function Modal({
       aria-labelledby={titleId}
     >
       <div
-        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl will-change-transform dark:border-slate-800 dark:bg-slate-900 ${
+        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl will-change-transform dark:border-slate-800 dark:bg-slate-900 ${
           closing ? "modal-panel-out" : "modal-panel"
         } ${sizes[size]}`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5 dark:border-slate-800">
-          <div className="flex items-center gap-3">
+        <div
+          className={`flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/50 px-6 py-5 dark:border-slate-800 dark:bg-slate-800/30 ${
+            closing ? "" : "modal-header"
+          }`}
+        >
+          <div className="flex items-center gap-3.5">
             {Icon && (
-              <div className="modal-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 ring-1 ring-inset ring-blue-600/10 dark:bg-blue-500/10 dark:text-blue-400">
+              <div className="modal-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600 shadow-sm shadow-blue-500/10 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-400">
                 <Icon size={20} />
               </div>
             )}
             <div>
-              <h3 id={titleId} className="text-lg font-bold text-slate-900 dark:text-white">{title}</h3>
+              <h3 id={titleId} className="text-base font-bold tracking-tight text-slate-900 dark:text-white">{title}</h3>
               {subtitle && (
-                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+                <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">{subtitle}</p>
               )}
             </div>
           </div>
@@ -97,10 +101,14 @@ export default function Modal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div className={`flex-1 overflow-y-auto px-6 py-5 ${closing ? "" : "modal-body"}`}>{children}</div>
 
         {footer && (
-          <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4 dark:border-slate-800 dark:bg-slate-800/40">
+          <div
+            className={`flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4 dark:border-slate-800 dark:bg-slate-800/40 ${
+              closing ? "" : "modal-footer"
+            }`}
+          >
             {footer}
           </div>
         )}

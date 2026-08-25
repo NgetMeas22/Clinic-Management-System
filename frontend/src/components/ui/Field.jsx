@@ -18,10 +18,10 @@ export default function Field({
       {label && (
         <label
           htmlFor={htmlFor}
-          className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+          className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400"
         >
           {label}
-          {required && <span className="ml-0.5 text-red-500">*</span>}
+          {required && <span className="ml-0.5 text-rose-500">*</span>}
         </label>
       )}
       {children}

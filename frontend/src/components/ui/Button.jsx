@@ -2,7 +2,7 @@ import { Loader2 } from "lucide-react";
 
 const VARIANTS = {
   primary:
-    "bg-blue-600 text-white shadow-sm shadow-blue-600/20 hover:-translate-y-px hover:bg-blue-700 hover:shadow-md hover:shadow-blue-600/25 active:translate-y-0 active:scale-[0.98] focus-visible:ring-blue-500/30",
+    "bg-blue-600 text-white shadow-lg shadow-blue-500/20 hover:-translate-y-px hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/30 active:translate-y-0 active:scale-[0.98] focus-visible:ring-blue-500/30",
   secondary:
     "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-700",
   danger:

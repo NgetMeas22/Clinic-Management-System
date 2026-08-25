@@ -35,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
     Route::put('/password', [AuthController::class, 'changePassword']);
+    Route::delete('/account', [AuthController::class, 'deleteAccount']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // Dashboard Routes (Admin, Doctor, Receptionist)
@@ -116,4 +117,3 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('/reports/payments', [ReportController::class, 'payments']);
     Route::get('/reports/medicines', [ReportController::class, 'medicines']);
 });
-

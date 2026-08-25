@@ -602,9 +602,9 @@ export default function Doctors() {
         }
       >
         <form id="doctor-form" onSubmit={handleSubmit} className="space-y-5">
-          <div className="rounded-xl border border-slate-200 p-5 dark:border-slate-800">
-            <h4 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-4 text-sm font-bold text-slate-900 dark:border-slate-800 dark:text-white">
-              <User size={15} className="text-blue-600" />
+          <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-5 transition-colors dark:border-slate-800 dark:bg-slate-800/30">
+            <h4 className="mb-4 flex items-center gap-2 border-b border-slate-200/70 pb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-700/60 dark:text-slate-400">
+              <User size={14} className="text-blue-600 dark:text-blue-400" />
               Identity
             </h4>
             <div className="flex flex-col gap-5 sm:flex-row">
@@ -656,9 +656,9 @@ export default function Doctors() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 p-5 dark:border-slate-800">
-            <h4 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-4 text-sm font-bold text-slate-900 dark:border-slate-800 dark:text-white">
-              <BadgeCheck size={15} className="text-blue-600" />
+          <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-5 transition-colors dark:border-slate-800 dark:bg-slate-800/30">
+            <h4 className="mb-4 flex items-center gap-2 border-b border-slate-200/70 pb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-700/60 dark:text-slate-400">
+              <BadgeCheck size={14} className="text-blue-600 dark:text-blue-400" />
               Professional Information
             </h4>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -709,9 +709,9 @@ export default function Doctors() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 p-5 dark:border-slate-800">
-            <h4 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-4 text-sm font-bold text-slate-900 dark:border-slate-800 dark:text-white">
-              <Phone size={15} className="text-blue-600" />
+          <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-5 transition-colors dark:border-slate-800 dark:bg-slate-800/30">
+            <h4 className="mb-4 flex items-center gap-2 border-b border-slate-200/70 pb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-700/60 dark:text-slate-400">
+              <Phone size={14} className="text-blue-600 dark:text-blue-400" />
               Contact Information
             </h4>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -743,7 +743,7 @@ export default function Doctors() {
             </div>
             <div className="mt-4">
               <div className="mb-1.5 flex items-center justify-between">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Brief Bio
                 </label>
                 <span className="text-xs font-medium text-slate-400">

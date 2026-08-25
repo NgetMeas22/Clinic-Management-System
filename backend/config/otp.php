@@ -22,5 +22,5 @@ return [
 
     'resend_after_seconds' => env('OTP_RESEND_AFTER_SECONDS', 60),
 
-    'debug' => env('OTP_DEBUG', env('APP_ENV') !== 'production'),
+    'debug' => env('OTP_DEBUG', false),
 ];
