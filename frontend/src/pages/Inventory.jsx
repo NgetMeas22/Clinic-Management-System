@@ -158,14 +158,11 @@ const Inventory = () => {
 
   useEffect(() => {
     const handler = setTimeout(() => {
+      setPage(1);
       loadMedicines();
     }, 300);
     return () => clearTimeout(handler);
-  }, [loadMedicines]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [search]);
+  }, [loadMedicines, search]);
 
   useEffect(() => {
     if (!toast) return;

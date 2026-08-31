@@ -7,6 +7,7 @@ import {
   FileText,
   Pencil,
   Plus,
+  SlidersHorizontal,
   Stethoscope,
   Trash2,
   User,
@@ -19,7 +20,6 @@ import { useAuth } from "../context/AuthContext";
 import { useLocale } from "../context/LocaleContext";
 import { can } from "../utils/permissions";
 import {
-  Badge,
   Button,
   Card,
   Field,
@@ -56,6 +56,30 @@ function MedicalRecordsPageStyles() {
         .animate-fade-up { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
       }
     `}</style>
+  );
+}
+
+// Matches the dot-badge pattern used for Status on the Departments page:
+// soft tinted background + a small solid dot + colored text. A record with
+// a real diagnosis reads as emerald (same as "Active"); one without reads
+// as neutral slate rather than borrowing the "Inactive" red, since a blank
+// diagnosis isn't an error state, just missing data.
+function DiagnosisPill({ diagnosis, unspecifiedLabel }) {
+  const hasDiagnosis = Boolean(diagnosis);
+  return (
+    <span
+      className={`inline-flex max-w-[180px] items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+        hasDiagnosis
+          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+          : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+      }`}
+      title={diagnosis || unspecifiedLabel}
+    >
+      <span
+        className={`h-1.5 w-1.5 shrink-0 rounded-full ${hasDiagnosis ? "bg-emerald-500" : "bg-slate-400"}`}
+      />
+      <span className="truncate">{diagnosis || unspecifiedLabel}</span>
+    </span>
   );
 }
 
@@ -467,6 +491,41 @@ export default function MedicalRecords() {
             }
           />
 
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                icon: FileText,
+                label: t("medicalRecords.totalRecordsStat"),
+                value: meta.total,
+                iconClass: "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400",
+              },
+              {
+                icon: User,
+                label: t("medicalRecords.patientsServed"),
+                value: new Set(records.map((r) => r.patient_id)).size,
+                iconClass: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400",
+              },
+              {
+                icon: Stethoscope,
+                label: t("medicalRecords.todayRecords"),
+                value: records.filter((r) => r.visit_date === new Date().toISOString().split("T")[0]).length,
+                iconClass: "bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400",
+              },
+            ].map(({ icon: Icon, label, value, iconClass }, index) => (
+              <div key={label} className="animate-fade-up" style={{ animationDelay: `${index * 60}ms` }}>
+                <Card padded className="flex items-center gap-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconClass}`}>
+                    <Icon size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
+                    <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-white">{value}</p>
+                  </div>
+                </Card>
+              </div>
+            ))}
+          </div>
+
           <Card className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
               <SearchInput
@@ -488,8 +547,22 @@ export default function MedicalRecords() {
                 ))}
               </SelectInput>
             </div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              {meta.total.toLocaleString()} {t("medicalRecords.totalRecord")}
+            <div className="flex items-center gap-2">
+              <span className="whitespace-nowrap text-sm font-medium text-slate-600 dark:text-slate-300">
+                {meta.total.toLocaleString()} {t("medicalRecords.totalRecord")}
+              </span>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSearchTerm("");
+                  setSelectedDiagnosis("All");
+                }}
+                title="Reset filters"
+                className="transition-transform duration-150 active:scale-90"
+              >
+                <SlidersHorizontal size={16} />
+                <span className="hidden sm:inline">{t("medicalRecords.reset")}</span>
+              </Button>
             </div>
           </Card>
 
@@ -501,15 +574,17 @@ export default function MedicalRecords() {
 
           <Card>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
-                    <th className="px-4 py-3.5 text-left">{t("medicalRecords.colPatient")}</th>
-                    <th className="px-4 py-3.5 text-left">{t("medicalRecords.colDoctor")}</th>
-                    <th className="px-4 py-3.5 text-left">{t("medicalRecords.colDiagnosis")}</th>
-                    <th className="px-4 py-3.5 text-left">{t("medicalRecords.colSymptoms")}</th>
-                    <th className="px-4 py-3.5 text-left">{t("medicalRecords.colTreatment")}</th>
-                    <th className="px-4 py-3.5 text-right">{t("common.actions")}</th>
+                  <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
+                    <th className="px-6 py-3.5">{t("medicalRecords.colPatient")}</th>
+                    <th className="px-6 py-3.5">{t("medicalRecords.colDoctor")}</th>
+                    <th className="px-6 py-3.5">{t("medicalRecords.colDiagnosis")}</th>
+                    <th className="px-6 py-3.5">{t("medicalRecords.colSymptoms")}</th>
+                    <th className="px-6 py-3.5">{t("medicalRecords.colTreatment")}</th>
+                    <th className="sticky right-0 z-10 border-l border-slate-200 bg-slate-50/95 px-4 py-3.5 text-right backdrop-blur dark:border-slate-800 dark:bg-slate-800/95">
+                      {t("common.actions")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -517,49 +592,63 @@ export default function MedicalRecords() {
                     Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i}>
                         {Array.from({ length: 6 }).map((__, j) => (
-                          <td key={j} className="px-4 py-4">
+                          <td
+                            key={j}
+                            className={
+                              j === 5
+                                ? "sticky right-0 border-l border-slate-100 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900"
+                                : "px-6 py-4"
+                            }
+                          >
                             <div className="h-4 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
                           </td>
                         ))}
                       </tr>
                     ))
                   ) : records.length > 0 ? (
-                    records.map((record) => (
-                      <tr key={record.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                        <td className="px-4 py-3.5">
+                    records.map((record, i) => (
+                      <tr key={record.id} className="group animate-fade-up transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40" style={{ animationDelay: `${i * 30}ms` }}>
+                        <td className="px-6 py-4">
                           <div className="flex items-center gap-2.5">
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-400">
-                              <User size={14} />
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-400">
+                              <User size={15} />
                             </div>
                             <div className="min-w-0">
-                              <div className="truncate text-xs font-semibold text-slate-900 dark:text-white">
+                              <div className="truncate text-sm font-bold text-slate-900 dark:text-white">
                                 {getPatientName(record.patient)}
                               </div>
-                              <span className="block text-[10px] text-slate-400">
+                              <span className="block text-xs text-slate-400">
                                 ID: #{record.patient_id || "-"}
                               </span>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-slate-700 dark:text-slate-300">
+                        <td className="px-6 py-4 text-slate-700 dark:text-slate-300">
                           <div className="flex items-center gap-1.5">
                             <Stethoscope size={14} className="shrink-0 text-slate-400" />
-                            <span className="truncate text-xs">
+                            <span className="truncate text-sm">
                               {record.doctor?.user?.name || record.doctor?.name || "-"}
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3.5">
-                          <Badge tone="emerald" label={record.diagnosis || t("medicalRecords.unspecified")} dot={false} />
+                        <td className="px-6 py-4">
+                          <DiagnosisPill
+                            diagnosis={record.diagnosis}
+                            unspecifiedLabel={t("medicalRecords.unspecified")}
+                          />
                         </td>
-                        <td className="max-w-[160px] truncate px-4 py-3.5 text-xs text-slate-600 dark:text-slate-300">
-                          {record.symptoms || "-"}
+                        <td className="px-6 py-4">
+                          <div className="max-w-[200px] truncate text-sm text-slate-600 dark:text-slate-300" title={record.symptoms}>
+                            {record.symptoms || "-"}
+                          </div>
                         </td>
-                        <td className="max-w-[160px] truncate px-4 py-3.5 text-xs text-slate-600 dark:text-slate-300">
-                          {record.treatment || "-"}
+                        <td className="px-6 py-4">
+                          <div className="max-w-[200px] truncate text-sm text-slate-600 dark:text-slate-300" title={record.treatment}>
+                            {record.treatment || "-"}
+                          </div>
                         </td>
-                        <td className="px-4 py-3.5 text-right">
-                          <div className="inline-flex items-center gap-1.5">
+                        <td className="sticky right-0 border-l border-slate-100 bg-white px-4 py-4 group-hover:bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900 dark:group-hover:bg-slate-800/40">
+                          <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -568,6 +657,7 @@ export default function MedicalRecords() {
                                 setShowRecord(true);
                               }}
                               className="text-slate-600 hover:bg-slate-50! dark:text-slate-400 dark:hover:bg-slate-800/40!"
+                              title={t("medicalRecords.viewDetails")}
                             >
                               <Eye size={14} />
                             </Button>
@@ -577,9 +667,10 @@ export default function MedicalRecords() {
                                 size="sm"
                                 onClick={() => openEdit(record)}
                                 className="text-blue-600 hover:bg-blue-50! dark:text-blue-400 dark:hover:bg-blue-950/40!"
+                                title={t("common.edit")}
                               >
                                 <Pencil size={14} />
-                                {t("common.edit")}
+                                <span className="hidden sm:inline">{t("common.edit")}</span>
                               </Button>
                             )}
                             {canDelete && (
@@ -588,9 +679,10 @@ export default function MedicalRecords() {
                                 size="sm"
                                 onClick={() => confirmDelete(record)}
                                 className="text-red-600 hover:bg-red-50! dark:text-red-400 dark:hover:bg-red-950/30!"
+                                title={t("common.delete")}
                               >
                                 <Trash2 size={14} />
-                                {t("common.delete")}
+                                <span className="hidden sm:inline">{t("common.delete")}</span>
                               </Button>
                             )}
                             {!canUpdate && !canDelete && (
@@ -602,8 +694,8 @@ export default function MedicalRecords() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="6" className="px-4 py-16">
-                        <div className="flex flex-col items-center gap-2 text-center">
+                      <td colSpan="6" className="px-6 py-16 text-center">
+                        <div className="flex flex-col items-center gap-2">
                           <div className="rounded-full bg-slate-100 p-3 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
                             <FileText size={22} />
                           </div>

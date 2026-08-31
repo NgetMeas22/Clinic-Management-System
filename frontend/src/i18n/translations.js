@@ -363,6 +363,11 @@ export const translations = {
     "medicalRecords.deleteSubtitle": "This removes the record.",
     "medicalRecords.deleteWarning": "This action cannot be undone.",
     "medicalRecords.confirmDelete": "Yes, delete record",
+    "medicalRecords.totalRecordsStat": "Total records",
+    "medicalRecords.patientsServed": "Patients served",
+    "medicalRecords.todayRecords": "Today's records",
+    "medicalRecords.reset": "Reset",
+    "medicalRecords.viewDetails": "View details",
 
     "prescriptions.title": "Prescriptions",
     "prescriptions.subtitle": "Medication prescriptions issued to patients.",

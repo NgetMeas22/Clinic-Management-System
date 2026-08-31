@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -99,7 +99,7 @@ const Prescriptions = () => {
   const canUpdate = can(user, "prescriptions", "update");
   const canDelete = can(user, "prescriptions", "delete");
 
-  const fetchPrescriptions = async () => {
+  const fetchPrescriptions = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -116,7 +116,7 @@ const Prescriptions = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, query, t]);
 
   const [lastQuery, setLastQuery] = useState(query);
   if (lastQuery !== query) {
@@ -129,7 +129,7 @@ const Prescriptions = () => {
       void fetchPrescriptions();
     }, 120);
     return () => clearTimeout(timer);
-  }, [query, page]);
+  }, [fetchPrescriptions]);
 
   useEffect(() => {
     if (!toast) return;
@@ -157,9 +157,11 @@ const Prescriptions = () => {
 
   useEffect(() => {
     if (!form.patient_id) {
-      setMedicalRecords([]);
-      setForm((f) => (f.medical_record_id ? { ...f, medical_record_id: "" } : f));
-      return;
+      const timer = setTimeout(() => {
+        setMedicalRecords([]);
+        setForm((f) => (f.medical_record_id ? { ...f, medical_record_id: "" } : f));
+      }, 0);
+      return () => clearTimeout(timer);
     }
     let isMounted = true;
 
