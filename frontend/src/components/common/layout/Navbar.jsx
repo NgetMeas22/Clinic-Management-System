@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   Bell,
+  Bot,
   CalendarClock,
   ChevronDown,
   ChevronRight,
@@ -19,6 +20,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import AiChatModal from "../../AiChatModal";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLocale } from "../../../context/LocaleContext";
 import LanguageSwitcher from "../../LanguageSwitcher";
@@ -53,7 +55,6 @@ const DEFAULT_NOTIFICATIONS = [
     unread: false,
   },
 ];
-
 const NOTIF_ICONS = {
   appointment: { Icon: CalendarClock, className: "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400" },
   inventory: { Icon: PackageX, className: "bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400" },
@@ -78,6 +79,7 @@ function pageTitleFromPath(pathname, t) {
 }
 
 export default function Navbar({ user, onLogout, title = "NGM Clinic", notifications = DEFAULT_NOTIFICATIONS }) {
+  const [isAiOpen, setIsAiOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -497,6 +499,16 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
             {/* Language toggle */}
             <LanguageSwitcher />
 
+            {/* AI Assistant */}
+            <button
+              type="button"
+              onClick={() => setIsAiOpen(true)}
+              className="rounded-xl p-2.5 text-blue-600 transition-colors hover:bg-blue-50 active:scale-95 dark:text-blue-400 dark:hover:bg-blue-950/40"
+              title={t("ai.title")}
+            >
+              <Bot size={19} />
+            </button>
+
             {/* Notifications */}
             <div className="relative" ref={notifRef}>
               <button
@@ -662,6 +674,9 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
           </div>
         </div>
       </header>
+
+      {/* AI Chat Modal */}
+      <AiChatModal isOpen={isAiOpen} onClose={() => setIsAiOpen(false)} />
 
       {/* Logout Confirmation Modal */}
       {showLogoutModal && (

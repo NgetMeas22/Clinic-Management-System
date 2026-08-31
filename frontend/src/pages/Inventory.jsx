@@ -23,7 +23,7 @@ import {
   Field,
   Modal,
   PageHeader,
-  Pagination,
+  Pagination,  
   SearchInput,
   TextArea,
   TextInput,

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AiAssistantController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
@@ -31,6 +32,8 @@ Route::post('/auth/otp/verify', [OtpController::class, 'verify'])->middleware('t
 
 // Authenticated Routes
 Route::middleware('auth:sanctum')->group(function () {
+
+    Route::post('/ai/ask', [AiAssistantController::class, 'ask']);
     // Auth & Profile
     Route::get('/me', [AuthController::class, 'me']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);

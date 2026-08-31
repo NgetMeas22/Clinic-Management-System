@@ -612,6 +612,12 @@ export const translations = {
     "settings.deleteConfirmBody": "This action is permanent. Your account will be deleted, or deactivated if it holds clinical history. This cannot be undone.",
     "settings.deleteConfirmCancel": "Keep my account",
     "settings.deleteConfirmAccept": "Yes, delete permanently",
+
+    "ai.title": "NGM Clinic AI Assistant",
+    "ai.greeting": "How can I help you in the NGM Clinic system today?",
+    "ai.placeholder": "Ask a question…",
+    "ai.thinking": "AI is thinking…",
+    "ai.error": "Sorry, there was a problem contacting the AI!",
   },
 
   km: {
@@ -932,5 +938,11 @@ export const translations = {
     "settings.deleteConfirmBody": "សកម្មភាពនេះមិនអាចត្រឡប់វិញបានទេ។ គណនីរបស់អ្នកនឹងត្រូវបានលុប ឬផ្អាកបើមានទិន្នន័យពេទ្យជាប់ទាក់ទង។",
     "settings.deleteConfirmCancel": "រក្សាទុកគណនីរបស់ខ្ញុំ",
     "settings.deleteConfirmAccept": "បាទ/ចា៎ លុបជាអចិន្ត្រៃយ៍",
+
+    "ai.title": "អ្នកជំនួយ AI គ្លីនិក NGM",
+    "ai.greeting": "តើខ្ញុំអាចជួយអ្វីអ្នកក្នុងប្រព័ន្ធ NGM Clinic ថ្ងៃនេះ?",
+    "ai.placeholder": "សួរសំណួរជាភាសាខ្មែរ...",
+    "ai.thinking": "AI កំពុងគិត...",
+    "ai.error": "សុំទោស មានបញ្ហាក្នុងការទាក់ទង AI!",
   },
 };
