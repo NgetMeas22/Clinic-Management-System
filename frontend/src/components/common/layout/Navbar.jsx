@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -89,6 +89,7 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [searchResults, setSearchResults] = useState({
     patients: [],
     doctors: [],
@@ -124,6 +125,7 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
       if (q.length < 2) {
         setSearchResults({ patients: [], doctors: [], medicines: [], appointments: [] });
         setSearchLoading(false);
+        setActiveIndex(0);
         return;
       }
 
@@ -147,9 +149,11 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
           medicines: extract(medicinesRes),
           appointments: extract(appointmentsRes),
         });
+        setActiveIndex(0);
       } catch (error) {
         console.error("Search failed:", error);
         setSearchResults({ patients: [], doctors: [], medicines: [], appointments: [] });
+        setActiveIndex(0);
       } finally {
         setSearchLoading(false);
       }
@@ -165,13 +169,6 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
     searchResults.doctors.length +
     searchResults.medicines.length +
     searchResults.appointments.length;
-
-  const goToSearchResult = (path, query) => {
-    setSearchOpen(false);
-    setSearchQuery("");
-    const target = localizedPath(query ? `${path}?search=${encodeURIComponent(query)}` : path);
-    navigate(target);
-  };
 
   // Close dropdowns on outside click.
   useEffect(() => {
@@ -302,6 +299,44 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
     },
   ].filter((group) => group.items.length > 0);
 
+  const flatResults = useMemo(() => {
+    const flat = [];
+    searchGroups.forEach((group) => {
+      group.items.slice(0, 5).forEach((item) => {
+        flat.push({ group, item });
+      });
+    });
+    return flat;
+  }, [searchGroups]);
+
+  const clampedActiveIndex = flatResults.length ? activeIndex % flatResults.length : 0;
+
+  const goToSearchResult = (path, query) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setActiveIndex(0);
+    const target = localizedPath(query ? `${path}?search=${encodeURIComponent(query)}` : path);
+    navigate(target);
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (!searchOpen) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (flatResults.length) setActiveIndex((i) => (i + 1) % flatResults.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (flatResults.length)
+        setActiveIndex((i) => (i - 1 + flatResults.length) % flatResults.length);
+    } else if (e.key === "Enter") {
+      if (flatResults.length) {
+        e.preventDefault();
+        const current = flatResults[clampedActiveIndex] || flatResults[0];
+        goToSearchResult(current.group.to, searchQuery);
+      }
+    }
+  };
+
   return (
     <>
       <header
@@ -330,17 +365,24 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
               size={18}
               className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors"
             />
-            <input
+<input
               type="text"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setSearchOpen(true);
+                setActiveIndex(0);
               }}
               onFocus={() => setSearchOpen(true)}
+              onKeyDown={handleSearchKeyDown}
               placeholder={t("navbar.searchPlaceholder")}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700/80 dark:bg-slate-800/50 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-blue-500 dark:focus:bg-slate-800"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-10 pr-10 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700/80 dark:bg-slate-800/50 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:bg-slate-800"
             />
+            {searchLoading && searchQuery.trim().length >= 2 && (
+              <span className="absolute right-9 top-1/2 -translate-y-1/2">
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+              </span>
+            )}
             {searchQuery && (
               <button
                 onClick={() => {
@@ -371,44 +413,78 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
                       {t("navbar.noResults", { query: searchQuery })}
                     </p>
                   ) : (
-                    searchGroups.map((group) => {
-                      const { Icon, className } = SEARCH_ICONS[group.key];
+                    (() => {
+                      let offset = 0;
                       return (
-                        <div key={group.key} className="mb-1 last:mb-0">
-                          <p className="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                            <Icon size={12} className={className} />
-                            {group.label}
-                          </p>
-                          {group.items.slice(0, 5).map((item) => (
-                            <button
-                              key={item.id}
-                              onClick={() => goToSearchResult(group.to, searchQuery)}
-                              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/70"
-                            >
-                              {item.avatar ? (
-                                <img
-                                  src={item.avatar}
-                                  alt={item.label}
-                                  className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700"
-                                />
-                              ) : (
-                                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${className}`}>
-                                  <Icon size={15} />
-                                </div>
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                                  {item.label}
+                        <>
+                          {searchGroups.map((group) => {
+                            const { Icon, className } = SEARCH_ICONS[group.key];
+                            const groupStart = offset;
+                            const items = group.items.slice(0, 5);
+                            offset += items.length;
+                            return (
+                              <div key={group.key} className="mb-1 last:mb-0">
+                                <p className="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                  <Icon size={12} className={className} />
+                                  {group.label}
+                                  <span className="ml-auto text-[10px] font-medium text-slate-300 dark:text-slate-500">
+                                    {group.items.length}
+                                  </span>
                                 </p>
-                                {item.sub && (
-                                  <p className="truncate text-xs text-slate-400">{item.sub}</p>
-                                )}
+                                {items.map((item, i) => {
+                                  const itemIndex = groupStart + i;
+                                  const isActive = itemIndex === clampedActiveIndex;
+                                  return (
+                                    <button
+                                      key={`${group.key}-${item.id}`}
+                                      onMouseEnter={() => setActiveIndex(itemIndex)}
+                                      onClick={() => goToSearchResult(group.to, searchQuery)}
+                                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${
+                                        isActive
+                                          ? "bg-blue-50 dark:bg-blue-950/40"
+                                          : "hover:bg-slate-50 dark:hover:bg-slate-800/70"
+                                      }`}
+                                    >
+                                      {item.avatar ? (
+                                        <img
+                                          src={item.avatar}
+                                          alt={item.label}
+                                          className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+                                        />
+                                      ) : (
+                                        <div
+                                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${className}`}
+                                        >
+                                          <Icon size={15} />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                          {item.label}
+                                        </p>
+                                        {item.sub && (
+                                          <p className="truncate text-xs text-slate-400">{item.sub}</p>
+                                        )}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                                <button
+                                  onClick={() => goToSearchResult(group.to, searchQuery)}
+                                  className="mt-0.5 flex w-full items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
+                                >
+                                  {t("navbar.viewAll", { label: group.label })}
+                                </button>
                               </div>
-                            </button>
-                          ))}
-                        </div>
+                            );
+                          })}
+                          <p className="mt-1 border-t border-slate-100 pt-2 text-center text-[11px] text-slate-300 dark:border-slate-800 dark:text-slate-500">
+                            {totalResults} {t("navbar.resultsHint").toLowerCase()} &middot;{" "}
+                            {t("navbar.keyboardHint")}
+                          </p>
+                        </>
                       );
-                    })
+                    })()
                   )}
                 </div>
               </div>

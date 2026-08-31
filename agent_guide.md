@@ -296,12 +296,33 @@ Notes / gotchas:
 - Feature pages (Doctor, Patients, User, Inventory, Billing, Appointments, …) are built on
   this kit. **Prefer composing these over hand-rolling new buttons/tables/modals/fields.**
   Check an existing page for the established usage pattern before writing a new one.
+- **`Card` does NOT forward a `style` prop.** To stagger row/stat entrance animations, wrap
+  `Card` in a plain `<div style={{ animationDelay: '…' }}>` (see `Department.jsx` StatCard /
+  table rows).
+- **`Modal` animation keys live in `src/index.css`**: `modal-backdrop(-out)`,
+  `modal-panel(-out)`, `modal-icon`, and the staggered `modal-header`/`modal-body`/`modal-footer`
+  entrances (all disabled under `prefers-reduced-motion`). The exit duration is `EXIT_MS = 160`.
+  The create/edit modal is a centered pop-in; there is currently no right-slide/drawer variant —
+  add one if a side-panel pattern is requested.
 
 ### URL-synced search (`src/hooks/useUrlSearch.js`)
 
 - `const [term, setTerm] = useUrlSearch()` keeps a page's search box in sync with the
   `?search=` query param (default key `"search"`), so the global navbar search can deep-link
   onto any list page pre-filtered. Use it for new list pages.
+
+### Navbar global search (`src/components/common/layout/Navbar.jsx`)
+
+- Debounced live search across patients, doctors, medicines, and appointments with a loading
+  spinner, per-group result counts and "View all" links, and a result-count/keyboard-hint
+  footer.
+- Keyboard support: **↑/↓** highlight a result (follows **ArrowDown** then **Enter**), hover
+  also highlights, **Escape** closes. `flatResults` is a flattened list of the first 5 items per
+  group (`searchGroups`); `clampedActiveIndex` guards the index. Reset `activeIndex` to 0 on
+  query change/empty (inside the async handlers — do **not** `setState` synchronously in an
+  effect, ESLint `react-hooks/set-state-in-effect`).
+- Selecting a result (or `?search=` deep-link) navigates to the list page with
+  `?search=<term>`; the page's `useUrlSearch()` then applies the filter.
 
 ### Pages (`src/pages/`)
 
@@ -313,6 +334,13 @@ and `Auth/Doctor.jsx` (a stray re-export of the `Doctor` page — leave alone un
 
 Note: `/inventory` and `/billing` are now **full standalone pages** (`Inventory.jsx`,
 `Billing.jsx`) — they no longer simply re-render `Medicine`/`Payment`.
+
+`Department.jsx` was rebuilt from mock/demo data to a **real API-driven page** — it is the
+reference example for a fully-upgraded CRUD page: shared UI kit, permission-gated
+Add/Edit/Delete (`can(user, "departments", ...)`), animated stat cards, create/edit modal
+with `autoFocus`, staggered row/modal animations, toast + delete-confirm modal, skeleton
+loading, empty state with a "Create the first one" button, and `?search=` URL-synced search.
+Doctors and Patients follow the same pattern.
 
 - **Login** also offers "Sign in with Google", which hard-navigates to
   `` `${api.defaults.baseURL}/auth/google` `` (i.e. `http://127.0.0.1:8000/api/auth/google`)
@@ -332,11 +360,13 @@ Note: `/inventory` and `/billing` are now **full standalone pages** (`Inventory.
 
 ### Services (`src/services/`)
 
-`api.js` (re-exports the shared instance from `src/api/axios.js`) + `appointmentService`,
-`dashboardService`, `doctorService`, `medicalRecordService`, `medicineService`,
+`api.js` (re-exports the shared instance from `src/api/axios.js`) + `api/cache.js`
+(`cachedGet` / `invalidateCache`) + `appointmentService`, `dashboardService`,
+`departmentService`, `doctorService`, `medicalRecordService`, `medicineService`,
 `patientService`, `paymentService`, `prescriptionService`, `reportService`, `userService`.
 New API calls should go through `api.js` (or a resource service importing it) so auth
-headers/401/403 handling apply.
+headers/401/403 handling apply. List services typically use `cachedGet`/`invalidateCache`
+and unwrap paginated responses via `utils/paginate.js` (`unwrapPaginator`).
 
 ### State
 
@@ -407,7 +437,11 @@ npm run lint                    # ESLint
 8. **Verify work.** Backend: `php artisan test` (PHPUnit) or manual Postman-style curl;
    frontend: `npm run build` / `npm run lint`. There are currently no dedicated test suites
    for the app domain beyond Laravel's `ExampleTest` stubs.
-9. **Docs files `plan.txt`/`Structure.txt`/`Database.txt` are historical.** Trust the code, not
+9. **New records should appear at the top after creation.** List pages sort newest-first
+   (`->latest()` on the backend) and reset to page 1 after a create (e.g.
+   `setCurrentPage(1)` in the save handler) so the just-created row is visible. Keep this
+   behavior on every CRUD page.
+10. **Docs files `plan.txt`/`Structure.txt`/`Database.txt` are historical.** Trust the code, not
    the docs, when they disagree (e.g., `Database.txt` predates the alter migrations; `Structure.txt`
    predates `routes/AppRoutes.jsx`, `api/axios.js`, `i18n/`; `AppointmentController` lives at
    top level; doctor status includes `on_leave`).

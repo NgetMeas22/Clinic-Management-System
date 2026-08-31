@@ -215,7 +215,7 @@ export default function AppointmentsManager({
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => onDelete(item.id)}
+                              onClick={() => onDelete(item)}
                               className="text-red-600 hover:!bg-red-50 dark:text-red-400 dark:hover:!bg-red-950/30"
                             >
                               <Trash2 size={14} />
