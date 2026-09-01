@@ -486,19 +486,19 @@ export default function Patients() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("patients.firstName")} required>
             <TextInput type="text" name="first_name" autoFocus value={formData.first_name} onChange={handleChange} />
           </Field>
           <Field label={t("patients.lastName")} required>
             <TextInput type="text" name="last_name" value={formData.last_name} onChange={handleChange} />
           </Field>
-          <Field label={t("patients.code")}>
+          <Field label={t("patients.code")} className="sm:col-span-2">
             <TextInput type="text" name="patient_code" value={formData.patient_code} onChange={handleChange} placeholder="PT-YYYY-XXXX" />
           </Field>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label={t("patients.gender")} required>
             <SelectInput name="gender" value={formData.gender} onChange={handleChange}>
               <option value="female">{t("patients.genderFemale")}</option>
@@ -534,7 +534,7 @@ export default function Patients() {
         <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           {t("patients.contactInfo")}
         </h4>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("patients.phone")}>
             <TextInput type="tel" name="phone" value={formData.phone} onChange={handleChange} />
           </Field>
@@ -553,7 +553,7 @@ export default function Patients() {
         <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           {t("patients.emergency")}
         </h4>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("patients.emergencyContact")}>
             <TextInput type="text" name="emergency_contact" value={formData.emergency_contact} onChange={handleChange} />
           </Field>

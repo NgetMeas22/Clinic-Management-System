@@ -527,7 +527,7 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
               </button>
 
               {notifOpen && (
-                <div className="absolute right-0 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                <div className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("navbar.notifications")}</p>
                     {unreadCount > 0 && (

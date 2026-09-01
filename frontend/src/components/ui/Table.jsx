@@ -17,7 +17,7 @@ export default function Table({
               {columns.map((col, i) => (
                 <th
                   key={col.key || i}
-                  className={`px-5 py-3.5 ${col.align === "right" ? "text-right" : "text-left"} ${col.className || ""}`}
+                  className={`px-3 py-3.5 sm:px-5 ${col.align === "right" ? "text-right" : "text-left"} ${col.className || ""}`}
                 >
                   {col.header}
                 </th>
@@ -29,7 +29,7 @@ export default function Table({
               Array.from({ length: 5 }).map((_, rowIndex) => (
                 <tr key={rowIndex}>
                   {columns.map((_, colIndex) => (
-                    <td key={colIndex} className="px-5 py-4">
+                    <td key={colIndex} className="px-3 py-4 sm:px-5">
                       <div className="h-4 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
                     </td>
                   ))}

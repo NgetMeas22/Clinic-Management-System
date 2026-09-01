@@ -44,7 +44,7 @@ export default function Pagination({
           label,
         })}
       </p>
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
         <button
           type="button"
           disabled={page <= 1}

@@ -614,10 +614,16 @@ export const translations = {
     "settings.deleteConfirmAccept": "Yes, delete permanently",
 
     "ai.title": "NGM Clinic AI Assistant",
-    "ai.greeting": "How can I help you in the NGM Clinic system today?",
+    "ai.greeting": "Hello! How can I help you in NGM Clinic system today?",
     "ai.placeholder": "Ask a question…",
     "ai.thinking": "AI is thinking…",
-    "ai.error": "Sorry, there was a problem contacting the AI!",
+    "ai.error": "Sorry, there was a problem contacting the AI! Please check Backend Server or API Key.",
+    "ai.clear": "Clear chat",
+    "ai.suggest1": "How to add a new doctor?",
+    "ai.suggest2": "Where can I view appointments?",
+    "ai.send": "Send",
+    "ai.status": "Online · responds instantly",
+    "ai.suggestLabel": "Try asking",
   },
 
   km: {
@@ -940,9 +946,15 @@ export const translations = {
     "settings.deleteConfirmAccept": "បាទ/ចា៎ លុបជាអចិន្ត្រៃយ៍",
 
     "ai.title": "អ្នកជំនួយ AI គ្លីនិក NGM",
-    "ai.greeting": "តើខ្ញុំអាចជួយអ្វីអ្នកក្នុងប្រព័ន្ធ NGM Clinic ថ្ងៃនេះ?",
-    "ai.placeholder": "សួរសំណួរជាភាសាខ្មែរ...",
+    "ai.greeting": "សួស្តី! តើខ្ញុំអាចជួយអ្វីអ្នកក្នុងប្រព័ន្ធ NGM Clinic ថ្ងៃនេះ?",
+    "ai.placeholder": "សួរសំណួរនៅទីនេះ...",
     "ai.thinking": "AI កំពុងគិត...",
-    "ai.error": "សុំទោស មានបញ្ហាក្នុងការទាក់ទង AI!",
+    "ai.error": "សុំទោស មានបញ្ហាក្នុងការភ្ជាប់ទៅកាន់ AI! សូមពិនិត្យមើល Backend Server ឬ API Key។",
+    "ai.clear": "លុបការសន្ទនា",
+    "ai.suggest1": "តើធ្វើដូចម្តេចដើម្បីបន្ថែមគ្រូពេទ្យថ្មី?",
+    "ai.suggest2": "តើត្រូវមើលប្រវត្តិណាត់ជួបនៅឯណា?",
+    "ai.send": "ផ្ញើ",
+    "ai.status": "តភ្ជាប់ · ឆ្លើយភ្លាមៗ",
+    "ai.suggestLabel": "សាកល្បងសួរ",
   },
 };

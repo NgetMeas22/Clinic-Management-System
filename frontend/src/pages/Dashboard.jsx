@@ -1328,7 +1328,7 @@ export default function Dashboard() {
             <h2 className="text-base font-bold text-slate-900">Status breakdown</h2>
             <p className="text-xs text-slate-500">Loaded appointments by status</p>
             {statusBreakdown.length > 0 ? (
-              <div className="mt-2 flex items-center gap-4">
+              <div className="mt-2 flex flex-col items-center gap-4 sm:flex-row sm:items-center">
                 <div className="h-28 w-28 shrink-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>

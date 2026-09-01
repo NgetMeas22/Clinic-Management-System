@@ -86,12 +86,12 @@ export default function AppointmentsManager({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
-                <th className="px-6 py-3.5 text-left">Patient Name</th>
-                <th className="px-6 py-3.5 text-left">Doctor</th>
-                <th className="px-6 py-3.5 text-left">Schedule</th>
-                <th className="px-6 py-3.5 text-left">Reason</th>
-                <th className="px-6 py-3.5 text-left">Status</th>
-                <th className="px-6 py-3.5 text-right">Actions</th>
+                <th className="px-3 py-3.5 text-left sm:px-6">Patient Name</th>
+                <th className="hidden px-3 py-3.5 text-left sm:px-6 md:table-cell">Doctor</th>
+                <th className="px-3 py-3.5 text-left sm:px-6">Schedule</th>
+                <th className="hidden px-3 py-3.5 text-left sm:px-6 lg:table-cell">Reason</th>
+                <th className="px-3 py-3.5 text-left sm:px-6">Status</th>
+                <th className="px-3 py-3.5 text-right sm:px-6">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -134,7 +134,7 @@ export default function AppointmentsManager({
                       key={item.id}
                       className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-4 sm:px-6">
                         <div className="flex items-center gap-3">
                           {item.patient?.avatar_url ? (
                             <img
@@ -161,7 +161,7 @@ export default function AppointmentsManager({
                         </div>
                       </td>
 
-                      <td className="px-6 py-4">
+                      <td className="hidden px-3 py-4 sm:px-6 md:table-cell">
                         <div className="flex items-center gap-2.5">
                           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
                             <User size={14} />
@@ -177,7 +177,7 @@ export default function AppointmentsManager({
                         </div>
                       </td>
 
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-4 sm:px-6">
                         <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
                           <Calendar size={14} className="text-slate-400" />
                           <span>{item.appointment_date || "N/A"}</span>
@@ -188,17 +188,17 @@ export default function AppointmentsManager({
                         </div>
                       </td>
 
-                      <td className="max-w-xs truncate px-6 py-4 text-slate-600 dark:text-slate-300">
+                      <td className="hidden max-w-xs truncate px-3 py-4 text-slate-600 dark:text-slate-300 lg:table-cell sm:px-6">
                         <span className="inline-block rounded border border-slate-200/60 bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                           {item.reason || "General Checkup"}
                         </span>
                       </td>
 
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-4 sm:px-6">
                         <Badge tone={statusTone(item.status)} label={item.status || "pending"} />
                       </td>
 
-                      <td className="relative px-6 py-4 text-right">
+                      <td className="relative px-3 py-4 text-right sm:px-6">
                         <div className="inline-flex items-center gap-1">
                           {onEdit && (
                             <Button
