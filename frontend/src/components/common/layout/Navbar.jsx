@@ -90,6 +90,10 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  // On mobile the inline search bar is replaced by an icon that expands
+  // into a full-width overlay row, so it doesn't fight the other icons
+  // for space and collapse to zero width.
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [searchResults, setSearchResults] = useState({
@@ -102,6 +106,7 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
   const searchRef = useRef(null);
+  const mobileSearchInputRef = useRef(null);
   const cancelBtnRef = useRef(null);
   const searchTimerRef = useRef(null);
 
@@ -183,6 +188,7 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
       }
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setSearchOpen(false);
+        setMobileSearchOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -198,6 +204,7 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
         setMenuOpen(false);
         setNotifOpen(false);
         setSearchOpen(false);
+        setMobileSearchOpen(false);
       }
     };
     document.addEventListener("keydown", handleEscape);
@@ -230,6 +237,14 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
     }
   }, [showLogoutModal]);
 
+  // Focus the mobile search input as soon as the overlay opens.
+  useEffect(() => {
+    if (mobileSearchOpen) {
+      const focusTimer = setTimeout(() => mobileSearchInputRef.current?.focus(), 50);
+      return () => clearTimeout(focusTimer);
+    }
+  }, [mobileSearchOpen]);
+
   const initials = (user?.name || title)
     .split(" ")
     .map((part) => part[0])
@@ -253,6 +268,12 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
   };
 
   const markAllRead = () => setNotifList((list) => list.map((n) => ({ ...n, unread: false })));
+
+  const closeMobileSearch = () => {
+    setMobileSearchOpen(false);
+    setSearchOpen(false);
+    setSearchQuery("");
+  };
 
   const searchGroups = [
     {
@@ -315,6 +336,7 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
 
   const goToSearchResult = (path, query) => {
     setSearchOpen(false);
+    setMobileSearchOpen(false);
     setSearchQuery("");
     setActiveIndex(0);
     const target = localizedPath(query ? `${path}?search=${encodeURIComponent(query)}` : path);
@@ -339,6 +361,100 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
     }
   };
 
+  // Shared results dropdown, reused by both the desktop inline bar and the
+  // mobile overlay so the two stay in sync.
+  const renderSearchResultsPanel = () => (
+    <div className="max-h-96 overflow-y-auto p-1.5">
+      {searchLoading && searchQuery.trim().length >= 2 ? (
+        <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-400">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+          {t("common.loading")}
+        </div>
+      ) : !searchQuery.trim() || searchQuery.trim().length < 2 ? (
+        <p className="px-4 py-8 text-center text-sm text-slate-400">
+          {t("common.search")}…
+        </p>
+      ) : totalResults === 0 ? (
+        <p className="px-4 py-8 text-center text-sm text-slate-400">
+          {t("navbar.noResults", { query: searchQuery })}
+        </p>
+      ) : (
+        (() => {
+          let offset = 0;
+          return (
+            <>
+              {searchGroups.map((group) => {
+                const { Icon, className } = SEARCH_ICONS[group.key];
+                const groupStart = offset;
+                const items = group.items.slice(0, 5);
+                offset += items.length;
+                return (
+                  <div key={group.key} className="mb-1 last:mb-0">
+                    <p className="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      <Icon size={12} className={className} />
+                      {group.label}
+                      <span className="ml-auto text-[10px] font-medium text-slate-300 dark:text-slate-500">
+                        {group.items.length}
+                      </span>
+                    </p>
+                    {items.map((item, i) => {
+                      const itemIndex = groupStart + i;
+                      const isActive = itemIndex === clampedActiveIndex;
+                      return (
+                        <button
+                          key={`${group.key}-${item.id}`}
+                          onMouseEnter={() => setActiveIndex(itemIndex)}
+                          onClick={() => goToSearchResult(group.to, searchQuery)}
+                          className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${
+                            isActive
+                              ? "bg-blue-50 dark:bg-blue-950/40"
+                              : "hover:bg-slate-50 dark:hover:bg-slate-800/70"
+                          }`}
+                        >
+                          {item.avatar ? (
+                            <img
+                              src={item.avatar}
+                              alt={item.label}
+                              className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+                            />
+                          ) : (
+                            <div
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${className}`}
+                            >
+                              <Icon size={15} />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                              {item.label}
+                            </p>
+                            {item.sub && (
+                              <p className="truncate text-xs text-slate-400">{item.sub}</p>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => goToSearchResult(group.to, searchQuery)}
+                      className="mt-0.5 flex w-full items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
+                    >
+                      {t("navbar.viewAll", { label: group.label })}
+                    </button>
+                  </div>
+                );
+              })}
+              <p className="mt-1 border-t border-slate-100 pt-2 text-center text-[11px] text-slate-300 dark:border-slate-800 dark:text-slate-500">
+                {totalResults} {t("navbar.resultsHint").toLowerCase()} &middot;{" "}
+                {t("navbar.keyboardHint")}
+              </p>
+            </>
+          );
+        })()
+      )}
+    </div>
+  );
+
   return (
     <>
       <header
@@ -348,7 +464,7 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
             : "border-slate-200/80 dark:border-slate-800/80"
         }`}
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2.5 sm:px-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2 sm:gap-4 sm:px-6 sm:py-2.5">
 
           {/* Page context: current section, matched to the sidebar's naming */}
           <div className="hidden min-w-0 flex-col sm:flex">
@@ -361,140 +477,109 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
             </h2>
           </div>
 
-          {/* Search Bar */}
-          <div className="relative max-w-xs flex-1 sm:max-w-sm" ref={searchRef}>
-            <Search
-              size={18}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors"
-            />
-<input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setSearchOpen(true);
-                setActiveIndex(0);
-              }}
-              onFocus={() => setSearchOpen(true)}
-              onKeyDown={handleSearchKeyDown}
-              placeholder={t("navbar.searchPlaceholder")}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-10 pr-10 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700/80 dark:bg-slate-800/50 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:bg-slate-800"
-            />
-            {searchLoading && searchQuery.trim().length >= 2 && (
-              <span className="absolute right-9 top-1/2 -translate-y-1/2">
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
-              </span>
-            )}
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setSearchOpen(false);
+          {/* Search Bar — inline on sm+, icon-triggered overlay on mobile */}
+          <div className="relative min-w-0 flex-1 sm:max-w-sm" ref={searchRef}>
+            {/* Desktop / tablet inline bar */}
+            <div className="relative hidden sm:block">
+              <Search
+                size={18}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setSearchOpen(true);
+                  setActiveIndex(0);
                 }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
-                aria-label="Clear search"
-              >
-                <X size={14} />
-              </button>
-            )}
+                onFocus={() => setSearchOpen(true)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder={t("navbar.searchPlaceholder")}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-10 pr-10 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700/80 dark:bg-slate-800/50 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:bg-slate-800"
+              />
+              {searchLoading && searchQuery.trim().length >= 2 && (
+                <span className="absolute right-9 top-1/2 -translate-y-1/2">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+                </span>
+              )}
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSearchOpen(false);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
+                  aria-label="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
 
-            {searchOpen && (
-              <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
-                <div className="max-h-96 overflow-y-auto p-1.5">
-                  {searchLoading && searchQuery.trim().length >= 2 ? (
-                    <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-400">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
-                      {t("common.loading")}
-                    </div>
-                  ) : !searchQuery.trim() || searchQuery.trim().length < 2 ? (
-                    <p className="px-4 py-8 text-center text-sm text-slate-400">
-                      {t("common.search")}…
-                    </p>
-                  ) : totalResults === 0 ? (
-                    <p className="px-4 py-8 text-center text-sm text-slate-400">
-                      {t("navbar.noResults", { query: searchQuery })}
-                    </p>
-                  ) : (
-                    (() => {
-                      let offset = 0;
-                      return (
-                        <>
-                          {searchGroups.map((group) => {
-                            const { Icon, className } = SEARCH_ICONS[group.key];
-                            const groupStart = offset;
-                            const items = group.items.slice(0, 5);
-                            offset += items.length;
-                            return (
-                              <div key={group.key} className="mb-1 last:mb-0">
-                                <p className="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                  <Icon size={12} className={className} />
-                                  {group.label}
-                                  <span className="ml-auto text-[10px] font-medium text-slate-300 dark:text-slate-500">
-                                    {group.items.length}
-                                  </span>
-                                </p>
-                                {items.map((item, i) => {
-                                  const itemIndex = groupStart + i;
-                                  const isActive = itemIndex === clampedActiveIndex;
-                                  return (
-                                    <button
-                                      key={`${group.key}-${item.id}`}
-                                      onMouseEnter={() => setActiveIndex(itemIndex)}
-                                      onClick={() => goToSearchResult(group.to, searchQuery)}
-                                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${
-                                        isActive
-                                          ? "bg-blue-50 dark:bg-blue-950/40"
-                                          : "hover:bg-slate-50 dark:hover:bg-slate-800/70"
-                                      }`}
-                                    >
-                                      {item.avatar ? (
-                                        <img
-                                          src={item.avatar}
-                                          alt={item.label}
-                                          className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700"
-                                        />
-                                      ) : (
-                                        <div
-                                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${className}`}
-                                        >
-                                          <Icon size={15} />
-                                        </div>
-                                      )}
-                                      <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                                          {item.label}
-                                        </p>
-                                        {item.sub && (
-                                          <p className="truncate text-xs text-slate-400">{item.sub}</p>
-                                        )}
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                                <button
-                                  onClick={() => goToSearchResult(group.to, searchQuery)}
-                                  className="mt-0.5 flex w-full items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
-                                >
-                                  {t("navbar.viewAll", { label: group.label })}
-                                </button>
-                              </div>
-                            );
-                          })}
-                          <p className="mt-1 border-t border-slate-100 pt-2 text-center text-[11px] text-slate-300 dark:border-slate-800 dark:text-slate-500">
-                            {totalResults} {t("navbar.resultsHint").toLowerCase()} &middot;{" "}
-                            {t("navbar.keyboardHint")}
-                          </p>
-                        </>
-                      );
-                    })()
-                  )}
+              {searchOpen && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                  {renderSearchResultsPanel()}
+                </div>
+              )}
+            </div>
+
+            {/* Mobile search trigger icon */}
+            <button
+              onClick={() => setMobileSearchOpen(true)}
+              className="flex items-center justify-center rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 active:scale-95 dark:text-slate-400 dark:hover:bg-slate-800 sm:hidden"
+              aria-label={t("navbar.searchPlaceholder")}
+            >
+              <Search size={19} />
+            </button>
+
+            {/* Mobile search overlay — replaces the whole header row */}
+            {mobileSearchOpen && (
+              <div className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/80 bg-white p-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:hidden">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search
+                      size={17}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      ref={mobileSearchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setSearchOpen(true);
+                        setActiveIndex(0);
+                      }}
+                      onKeyDown={handleSearchKeyDown}
+                      placeholder={t("navbar.searchPlaceholder")}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-9 pr-8 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700/80 dark:bg-slate-800/50 dark:text-slate-100 dark:placeholder:text-slate-500"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+                        aria-label="Clear search"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    onClick={closeMobileSearch}
+                    className="shrink-0 rounded-xl px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    {t("logout.cancel") || "Cancel"}
+                  </button>
+                </div>
+                <div className="mt-2 max-h-[70vh] overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                  {renderSearchResultsPanel()}
                 </div>
               </div>
             )}
           </div>
 
           {/* Right Action Icons & User Menu */}
-          <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
+          <div className="flex flex-shrink-0 items-center justify-end gap-0.5 sm:gap-2.5">
 
             {/* Language toggle */}
             <LanguageSwitcher />
@@ -503,23 +588,23 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
             <button
               type="button"
               onClick={() => setIsAiOpen(true)}
-              className="rounded-xl p-2.5 text-blue-600 transition-colors hover:bg-blue-50 active:scale-95 dark:text-blue-400 dark:hover:bg-blue-950/40"
+              className="rounded-xl p-2 text-blue-600 transition-colors hover:bg-blue-50 active:scale-95 dark:text-blue-400 dark:hover:bg-blue-950/40 sm:p-2.5"
               title={t("ai.title")}
             >
-              <Bot size={19} />
+              <Bot size={18} className="sm:size-[19px]" />
             </button>
 
             {/* Notifications */}
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifOpen((open) => !open)}
-                className="relative rounded-xl p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 active:scale-95 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                className="relative rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 active:scale-95 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 sm:p-2.5"
                 title={t("navbar.notifications")}
                 aria-expanded={notifOpen}
               >
-                <Bell size={19} />
+                <Bell size={18} className="sm:size-[19px]" />
                 {unreadCount > 0 && (
-                  <span className="absolute right-2 top-2 flex h-2 w-2">
+                  <span className="absolute right-1.5 top-1.5 flex h-2 w-2 sm:right-2 sm:top-2">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
                     <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
                   </span>
@@ -573,30 +658,30 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
               )}
             </div>
 
-            {/* Theme toggle */}
+            {/* Theme toggle — icon-only on mobile, labeled pill on sm+ */}
             <button
               onClick={toggleTheme}
-              className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-100 active:scale-95 dark:border-slate-700/80 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="flex items-center gap-2 rounded-xl p-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-100 active:scale-95 dark:text-slate-300 dark:hover:bg-slate-800 sm:border sm:border-slate-200/80 sm:bg-slate-50/50 sm:px-3 sm:py-2 sm:dark:border-slate-700/80 sm:dark:bg-slate-800/50"
               title={theme === "dark" ? t("navbar.switchLight") : t("navbar.switchDark")}
             >
               {theme === "dark" ? (
-                <Sun size={16} className="text-amber-400" />
+                <Sun size={18} className="text-amber-400 sm:size-4" />
               ) : (
-                <Moon size={16} className="text-slate-600" />
+                <Moon size={18} className="text-slate-600 sm:size-4" />
               )}
               <span className="hidden capitalize sm:inline">{theme}</span>
             </button>
 
-            <div className="h-5 w-px bg-slate-200 dark:bg-slate-800" />
+            <div className="hidden h-5 w-px bg-slate-200 dark:bg-slate-800 sm:block" />
 
             {/* User Profile Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setMenuOpen((open) => !open)}
-                className="group flex items-center gap-2.5 rounded-xl p-1.5 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/70"
+                className="group flex items-center gap-2 rounded-xl p-1 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/70 sm:gap-2.5 sm:p-1.5"
                 aria-expanded={menuOpen}
               >
-                <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-linear-to-tr from-blue-600 to-indigo-500 text-xs font-bold text-white shadow-sm ring-2 ring-white transition-transform group-hover:scale-105 dark:ring-slate-900">
+                <div className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-linear-to-tr from-blue-600 to-indigo-500 text-xs font-bold text-white shadow-sm ring-2 ring-white transition-transform group-hover:scale-105 dark:ring-slate-900 sm:h-9 sm:w-9">
                   {avatarVisible ? (
                     <img
                       src={avatarSrc}
@@ -621,7 +706,7 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
 
                 <ChevronDown
                   size={15}
-                  className={`text-slate-400 transition-transform duration-200 ${
+                  className={`hidden text-slate-400 transition-transform duration-200 sm:block ${
                     menuOpen ? "rotate-180" : ""
                   }`}
                 />
@@ -629,7 +714,7 @@ export default function Navbar({ user, onLogout, title = "NGM Clinic", notificat
 
               {/* Dropdown Menu */}
               {menuOpen && (
-                <div className="absolute right-0 mt-2 w-60 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-xl transition-all dark:border-slate-800 dark:bg-slate-900">
+                <div className="absolute right-0 mt-2 w-60 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-xl transition-all dark:border-slate-800 dark:bg-slate-900">
                   <div className="border-b border-slate-100 px-3 py-2.5 dark:border-slate-800">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                       {user?.name || title}
